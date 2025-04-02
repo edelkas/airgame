@@ -1,0 +1,2 @@
+Estéticos:
+  - Alineamiento de varias partes del código.

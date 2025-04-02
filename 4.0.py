@@ -309,10 +309,10 @@ class MedioEstrategico(Medio):
 
 class AvionCaza(MedioAereo):
     """Representa un avión de caza"""
-    nombre = "Avo. Caza"
-    precio = PRECIO_AVO_CAZA
-    icono  = iconos['AvionCaza']
-    info   = 'Único medio aéreo que puede atacar otros medios aéreos. El otro medio anti aéreo que puede hacerlo es la batería antiaérea.'
+    nombre      = "Avo. Caza"
+    precio      = PRECIO_AVO_CAZA
+    icono       = iconos['AvionCaza']
+    info        = 'Único medio aéreo que puede atacar otros medios aéreos. El otro medio que puede hacerlo es la batería antiaérea.'
     coste       = '50'
     velocidad   = '2100'
     autonomia   = '1.62'
@@ -325,10 +325,10 @@ class AvionCaza(MedioAereo):
     supaerea    = '10'
 class AvionAtaque(MedioAereo):
     """Representa un avión de ataque"""
-    nombre = "Avo. Ataque"
-    precio = PRECIO_AVO_ATAQUE
-    icono = iconos['AvionAtaque']
-    info = 'Medio aéreo capaz de atacar medios anti aéreos.'
+    nombre      = "Avo. Ataque"
+    precio      = PRECIO_AVO_ATAQUE
+    icono       = iconos['AvionAtaque']
+    info        = 'Medio aéreo capaz de atacar medios anti aéreos.'
     coste       = '65'
     velocidad   = '1350'
     autonomia   = '5,04'
@@ -341,10 +341,10 @@ class AvionAtaque(MedioAereo):
     supaerea    = '6'
 class AvionTransporte(MedioAereo):
     """Representa un avión de transporte"""
-    nombre = "Avo. Transporte"
-    precio = PRECIO_AVO_TRANSPORTE
-    icono = iconos['AvionTransporte']
-    info = 'Medio aéreo con más alcance.'
+    nombre      = "Avo. Transporte"
+    precio      = PRECIO_AVO_TRANSPORTE
+    icono       = iconos['AvionTransporte']
+    info        = 'Medio aéreo con más alcance.'
     coste       = '120'
     velocidad   = '820'
     autonomia   = '12,93'
@@ -358,10 +358,10 @@ class AvionTransporte(MedioAereo):
 
 class Helicoptero(MedioAereo):
     """Representa un helicóptero"""
-    nombre = "Helicóptero"
-    precio = PRECIO_HELICOPTERO
-    icono = iconos['Helicoptero']
-    info = 'Único medio aéreo capaz de aterrizar en una casilla que no sea una base. Además es capaz de atacar medios anti aéreos.'
+    nombre      = "Helicóptero"
+    precio      = PRECIO_HELICOPTERO
+    icono       = iconos['Helicoptero']
+    info        = 'Único medio aéreo capaz de aterrizar en una casilla que no sea una base. Además es capaz de atacar medios anti aéreos.'
     coste       = '21'
     velocidad   = '260'
     autonomia   = '2,58'
@@ -375,10 +375,10 @@ class Helicoptero(MedioAereo):
     
 class Dron(MedioAereo):
     """Representa un dron"""
-    nombre = "Dron"
-    precio = PRECIO_DRON
-    icono = iconos['Dron']
-    info = 'Único medio aéreo con capacidad de vigilancia y con mayor autonomía, además es capaz de atacar medios anti aéreos.'
+    nombre      = "Dron"
+    precio      = PRECIO_DRON
+    icono       = iconos['Dron']
+    info        = 'Único medio aéreo con capacidad de vigilancia y con mayor autonomía, además es capaz de atacar medios anti aéreos.'
     coste       = '25'
     velocidad   = '240'
     autonomia   = '13,5'
@@ -392,10 +392,10 @@ class Dron(MedioAereo):
 
 class Radar(MedioAntiaereo):
     """Representa un radar"""
-    nombre = "Radar"
-    precio = PRECIO_RADAR
-    icono = iconos['Radar']
-    info = 'Medio antiaéreo con el mayor alcance de vigilancia.'
+    nombre      = "Radar"
+    precio      = PRECIO_RADAR
+    icono       = iconos['Radar']
+    info        = 'Medio antiaéreo con el mayor alcance de vigilancia.'
     coste       = '24'
     velocidad   = '0'
     autonomia   = '0'
@@ -409,10 +409,10 @@ class Radar(MedioAntiaereo):
 
 class Bateria(MedioAntiaereo):
     """Representa una batería anti-aérea"""
-    nombre = "Batería"
-    precio = PRECIO_BATERIA
-    icono = iconos['Bateria']
-    info = 'Único medio antiaéreo con capacidad de atacar medios aéreos además de tener capacidad de vigilancia.'
+    nombre      = "Batería"
+    precio      = PRECIO_BATERIA
+    icono       = iconos['Bateria']
+    info        = 'Único medio antiaéreo con capacidad de vigilancia.'
     coste       = '90'
     velocidad   = '0'
     autonomia   = '0'
@@ -426,10 +426,10 @@ class Bateria(MedioAntiaereo):
 
 class Inteligencia(MedioEstrategico):
     """Clase genérica para representar inteligencia"""
-    nombre = "Inteligencia"
-    precio = PRECIO_INTELIGENCIA
-    icono = iconos['Inteligencia']
-    info = 'Medio estratégico que permite obtener diversa información sobre el adversario.'
+    nombre      = "Inteligencia"
+    precio      = PRECIO_INTELIGENCIA
+    icono       = iconos['Inteligencia']
+    info        = 'Medio estratégico que permite obtener diversa información sobre el adversario.'
     coste       = '-'
     velocidad   = '-'
     autonomia   = '-'
@@ -443,10 +443,10 @@ class Inteligencia(MedioEstrategico):
 
 class Infraestructura(MedioEstrategico):
     """Clase genérica que representa una infraestructura"""
-    nombre = "Infraestructura"
-    precio = PRECIO_INFRAESTRUCTURA
-    icono = iconos['Infraestructura']
-    info = 'Medio estratégico que permite aumentar el nivel de las ciudades y las bases propias.'
+    nombre      = "Infraestructura"
+    precio      = PRECIO_INFRAESTRUCTURA
+    icono       = iconos['Infraestructura']
+    info        = 'Medio estratégico que permite aumentar el nivel de las ciudades y las bases propias.'
     coste       = '-'
     velocidad   = '-'
     autonomia   = '-'
