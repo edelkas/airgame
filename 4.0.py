@@ -27,10 +27,14 @@
 #       Esqueleto del proceso en cada fotograma: escanear eventos,
 #       actualizar estado, y dibujar en pantalla.
 
-import os
+import enum    # Clases que funcionan como un enum de C
+import os      # Manipulaciones del sistema
+import pygame  # Motor del juego
+import random  # Para generacion de números aleatorios
+import re      # Para expresiones regulares (regex)
+
+# Lo siguiente es para evitar que se muestre publicidad de PyGame en la consola al iniciar
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
-import pygame
-import random
 
 
 # < -------------------------------------------------------------------------- >
@@ -42,17 +46,6 @@ NOMBRE_JUEGO    = "AIR GAME"
 NOMBRE_DEFECTO  = "Jugador"
 CREDITO_INICIAL = 500
 
-# Precios de productos
-PRECIO_AVO_CAZA         =  50
-PRECIO_AVO_ATAQUE       =  60
-PRECIO_AVO_TRANSPORTE   = 120
-PRECIO_HELICOPTERO      =  21
-PRECIO_DRON             =  25
-PRECIO_RADAR            =  24
-PRECIO_BATERIA          =  90
-PRECIO_INTELIGENCIA     =  50
-PRECIO_INFRAESTRUCTURA  = 100
-
 # Características generales de la interfaz
 ANCHURA                         = 1280      # Anchura de la ventana en pixeles
 ALTURA                          = 720       # Altura de la ventana en pixeles
@@ -60,17 +53,14 @@ PANTALLA_COMPLETA               = False     # Para abrir el juego en ventana com
 PANTALLA_MODIFICARDIMENSION     = False     # Para poder modificar la dimensión de la ventana
 FPS                             = 60        # Fotogramas por segundo
 COLOR_FONDO                     = "#cccccc" # Color RGB del fondo de pantalla
-
-# Configuraciones iniciales del programa (útil para streamlinear la programación)
-MUSICA_REPRODUCIR  = False # Activar o desactivar la música
-MOSTRAR_PANTALLAZO = False # Mostrar o saltar pantallazo inicial
-MOSTRAR_REGLAS     = False # Mostrar o saltan pantallazo de reglas
+MUSICA_REPRODUCIR               = False     # Activar o desactivar la música por defecto
 
 # Propiedades del texto
-COLOR_TEXTO        = (0, 0, 0)                  # Color RGB por defecto del texto
-TEXTO_FUENTE       = "CENTURY GOTHIC"           # Fuente de los textos
-TEXTO_TAMANOS      = [16, 20, 24, 36, 72, 180]  # Tamaños de fuente que se usaran
-TEXTO_TAMANO       = 24                         # Tamaño de fuente por defecto
+COLOR_TEXTO        = (0, 0, 0)        # Color RGB por defecto del texto
+TEXTO_FUENTE       = "Century Gothic" # Fuente de los textos
+TEXTO_FUENTE_MONO  = "Mono"           # Fuente para textos monoespaciados
+TEXTO_TAMANO       = 24               # Tamaño de fuente por defecto
+TEXTO_TAMANOS = [14, 16, 20, 24, 36, 72, 180]  # Tamaños de fuente que se usaran
 
 # Propiedades generales de todos los paneles, por defecto
 PANEL_BORDE_COLOR  = "#006600" # Color del borde de los paneles
@@ -181,7 +171,7 @@ REGLAS_LISTA = [
             \n\t\t[INFRAESTRUCTURA]: Medio estratégico que permite aumentar el nivel de las ciudades y bases propias.\
     \n\n-Panel de información: En el aparecerá la información correspondiente al elemento que en ese momento este indicando el ratón. Además de una breve descripción de cada producto aparecerá la siguiente información dependiendo de si se tratan de medios aéreos, anti aéreos o estratégicos:\
 		    \n\t-Medios aéreos y anti aéreos:\
-			\n\t\t[COSTE]: precio del medio (€)\
+			\n\t\t[PRECIO]: coste del medio (€)\
             \n\t\t[VELOCIDAD]: velocidad a la que va a poder avanzar por las casillas un producto / (km/h) - (casillas/turno).\
 			\n\t\t[AUTONOMÍA]: tiempo que va a poder estar fuera de la base un producto / (horas) - (turnos).\
 			\n\t\t[ALCANCE]: distancia (horizontal) a la que va a poder llegar un producto / (km) - (casillas).\
@@ -255,26 +245,16 @@ if (PANTALLA_COMPLETA): flags |= pygame.FULLSCREEN
 if (PANTALLA_MODIFICARDIMENSION): flags |= pygame.RESIZABLE
 pygame.init()
 pygame.display.set_caption(NOMBRE_JUEGO)
-pantalla = pygame.display.set_mode((ANCHURA, ALTURA), flags)
+g_pantalla = pygame.display.set_mode((ANCHURA, ALTURA), flags)
 clock = pygame.time.Clock()
 texto_ayuda = None
-texto_info  = None
-texto_coste = None
-texto_velocidad = None
-texto_autonomia = None
-texto_alcance = None
-texto_huella = None
-texto_aire = None
-texto_sup = None
-texto_vigilancia = None
-texto_radiovig = None
-texto_supaerea = None
 
 # Cargar recursos
 pygame.mixer.init()
 pygame.mixer.music.load(MUSICA_FONDO)
 imagen_pantallazo = cargar_imagen(IMAGEN_FONDO)
-fuentes = { tam: pygame.font.SysFont(TEXTO_FUENTE, tam) for tam in TEXTO_TAMANOS}
+fuentes = { tam: pygame.font.SysFont(TEXTO_FUENTE, tam) for tam in TEXTO_TAMANOS }
+fuentes_mono = { tam: pygame.font.SysFont(TEXTO_FUENTE_MONO, tam) for tam in TEXTO_TAMANOS }
 iconos = {
     'AvionCaza':       cargar_imagen('icono_caza.png'),
     'AvionAtaque':     cargar_imagen('icono_ataque.png'),
@@ -295,203 +275,174 @@ sonidos = {
 #                              CLASES DEL JUEGO
 # < -------------------------------------------------------------------------- >
 
-class Producto:
-    """Clase genérica que representa cualquier cosa comprable"""
-    def __init__(self, nombre, precio, icono, info, coste, velocidad, autonomia, alcance, huella, aire, sup, vigilancia, radiovig, supaerea):
-        self.nombre     = nombre
-        self.precio     = precio
-        self.icono      = icono
-        self.info       = info
-        self.coste      = coste
-        self.velocidad  = velocidad
-        self.autonomia  = autonomia
-        self.alcance    = alcance
-        self.huella     = huella
-        self.aire       = aire
-        self.sup        = sup
-        self.vigilancia = vigilancia
-        self.radiovig   = radiovig
-        self.supaerea   = supaerea
-
-class Medio(Producto):
-    """Representa cualquier medio militar"""
+class Medio:
+    """Clase genérica que representa cualquier medio militar"""
+    NOMBRE     = None
+    ICONO      = None
+    DESC       = None
+    PRECIO     = None
+    VELOCIDAD  = None
+    AUTONOMIA  = None
+    ALCANCE    = None
+    HUELLA     = None
+    AIRE       = None
+    SUP        = None
+    VIGILANCIA = None
+    RADIOVIG   = None
+    SUPAEREA   = None
 
     @classmethod
     def ayuda(cls):
-        return {
-            'help':       "%s (%dM)" % (cls.nombre, cls.precio),
-            'info':       cls.info,
-            'coste':      cls.coste,
-            'velocidad':  cls.velocidad,
-            'autonomia':  cls.autonomia,
-            'alcance':    cls.alcance,
-            'huella':     cls.huella,
-            'aire':       cls.aire,
-            'sup':        cls.sup,
-            'vigilancia': cls.vigilancia,
-            'radiovig':   cls.radiovig,
-            'supaerea':   cls.supaerea,
-        }
+        return "%s (%dM)" % (cls.NOMBRE, cls.PRECIO)
+
+    @classmethod
+    def info(cls):
+        texto = f"""
+            Descripción:  {cls.DESC}
+            Precio:       {cls.PRECIO}
+            Velocidad:    {cls.VELOCIDAD}
+            Autonomía:    {cls.AUTONOMIA}
+            Alcance:      {cls.ALCANCE}
+            Huella:       {cls.HUELLA}
+            Aire-aire:    {cls.AIRE}
+            Aire-sup:     {cls.SUP}
+            Vigilancia:   {cls.VIGILANCIA}
+            Radio vigil.: {cls.RADIOVIG}
+            Sup. aérea:   {cls.SUPAEREA}
+        """
+        return re.sub(r"^\s+", "", texto, flags = re.MULTILINE)
 
 class MedioAereo(Medio):
     """Representa cualquier medio aéreo"""
 
 class MedioAntiaereo(Medio):
     """Representa cualquier medio anti-aéreo"""
+    VELOCIDAD  = 0
+    AUTONOMIA  = 0
+    ALCANCE    = 0
 
 class MedioEstrategico(Medio):
     """Representa cualquier medio estratégico"""
 
 class AvionCaza(MedioAereo):
     """Representa un avión de caza"""
-    nombre      = "Avo. Caza"
-    precio      = PRECIO_AVO_CAZA
-    icono       = iconos['AvionCaza']
-    info        = 'Único medio aéreo que puede atacar otros medios aéreos. El otro medio que puede hacerlo es la batería antiaérea.'
-    coste       = '50'
-    velocidad   = '2100'
-    autonomia   = '1.62'
-    alcance     = '3400'
-    huella      = '4'
-    aire        = '170'
-    sup         = '0'
-    vigilancia  = '0'
-    radiovig    = '0'
-    supaerea    = '10'
+    NOMBRE     = "Avo. Caza"
+    ICONO      = iconos['AvionCaza']
+    DESC       = 'Único medio aéreo que puede atacar otros medios aéreos. El otro medio que puede hacerlo es la batería antiaérea.'
+    PRECIO     = 50
+    VELOCIDAD  = 2100
+    AUTONOMIA  = 1.62
+    ALCANCE    = 3400
+    HUELLA     = 4
+    AIRE       = 170
+    SUP        = 0
+    VIGILANCIA = 0
+    RADIOVIG   = 0
+    SUPAEREA   = 10
+
 class AvionAtaque(MedioAereo):
     """Representa un avión de ataque"""
-    nombre      = "Avo. Ataque"
-    precio      = PRECIO_AVO_ATAQUE
-    icono       = iconos['AvionAtaque']
-    info        = 'Medio aéreo capaz de atacar medios anti aéreos.'
-    coste       = '65'
-    velocidad   = '1350'
-    autonomia   = '5,04'
-    alcance     = '6800'
-    huella      = '15'
-    aire        = '0'
-    sup         = '240'
-    vigilancia  = '0'
-    radiovig    = '0'
-    supaerea    = '6'
+    NOMBRE     = "Avo. Ataque"
+    ICONO      = iconos['AvionAtaque']
+    DESC       = 'Medio aéreo capaz de atacar medios anti aéreos.'
+    PRECIO     = 65
+    VELOCIDAD  = 1350
+    AUTONOMIA  = 5.04
+    ALCANCE    = 6800
+    HUELLA     = 15
+    AIRE       = 0
+    SUP        = 240
+    VIGILANCIA = 0
+    RADIOVIG   = 0
+    SUPAEREA   = 6
+
 class AvionTransporte(MedioAereo):
     """Representa un avión de transporte"""
-    nombre      = "Avo. Transporte"
-    precio      = PRECIO_AVO_TRANSPORTE
-    icono       = iconos['AvionTransporte']
-    info        = 'Medio aéreo con más alcance.'
-    coste       = '120'
-    velocidad   = '820'
-    autonomia   = '12,93'
-    alcance     = '10600'
-    huella      = '60'
-    aire        = '0'
-    sup         = '0'
-    vigilancia  = '0'
-    radiovig    = '0'
-    supaerea    = '3'
+    NOMBRE     = "Avo. Transporte"
+    ICONO      = iconos['AvionTransporte']
+    DESC       = 'Medio aéreo con más alcance.'
+    PRECIO     = 120
+    VELOCIDAD  = 820
+    AUTONOMIA  = 12.93
+    ALCANCE    = 10600
+    HUELLA     = 60
+    AIRE       = 0
+    SUP        = 0
+    VIGILANCIA = 0
+    RADIOVIG   = 0
+    SUPAEREA   = 3
 
 class Helicoptero(MedioAereo):
     """Representa un helicóptero"""
-    nombre      = "Helicóptero"
-    precio      = PRECIO_HELICOPTERO
-    icono       = iconos['Helicoptero']
-    info        = 'Único medio aéreo capaz de aterrizar en una casilla que no sea una base. Además es capaz de atacar medios anti aéreos.'
-    coste       = '21'
-    velocidad   = '260'
-    autonomia   = '2,58'
-    alcance     = '670'
-    huella      = '10'
-    aire        = '0'
-    sup         = '10'
-    vigilancia  = '0'
-    radiovig    = '0'
-    supaerea    = '4'
-    
+    NOMBRE     = "Helicóptero"
+    ICONO      = iconos['Helicoptero']
+    DESC       = 'Único medio aéreo capaz de aterrizar en una casilla que no sea una base. Además es capaz de atacar medios anti aéreos.'
+    PRECIO     = 21
+    VELOCIDAD  = 260
+    AUTONOMIA  = 2.58
+    ALCANCE    = 670
+    HUELLA     = 10
+    AIRE       = 0
+    SUP        = 10
+    VIGILANCIA = 0
+    RADIOVIG   = 0
+    SUPAEREA   = 4
+
 class Dron(MedioAereo):
     """Representa un dron"""
-    nombre      = "Dron"
-    precio      = PRECIO_DRON
-    icono       = iconos['Dron']
-    info        = 'Único medio aéreo con capacidad de vigilancia y con mayor autonomía, además es capaz de atacar medios anti aéreos.'
-    coste       = '25'
-    velocidad   = '240'
-    autonomia   = '13,5'
-    alcance     = '3240'
-    huella      = '2'
-    aire        = '0'
-    sup         = '100'
-    vigilancia  = '20'
-    radiovig    = '240'
-    supaerea    = '2'
+    NOMBRE     = "Dron"
+    ICONO      = iconos['Dron']
+    DESC       = 'Único medio aéreo con capacidad de vigilancia y con mayor autonomía, además es capaz de atacar medios anti aéreos.'
+    PRECIO     = 25
+    VELOCIDAD  = 240
+    AUTONOMIA  = 13.5
+    ALCANCE    = 3240
+    HUELLA     = 2
+    AIRE       = 0
+    SUP        = 100
+    VIGILANCIA = 20
+    RADIOVIG   = 240
+    SUPAEREA   = 2
 
 class Radar(MedioAntiaereo):
     """Representa un radar"""
-    nombre      = "Radar"
-    precio      = PRECIO_RADAR
-    icono       = iconos['Radar']
-    info        = 'Medio antiaéreo con el mayor alcance de vigilancia.'
-    coste       = '24'
-    velocidad   = '0'
-    autonomia   = '0'
-    alcance     = '0'
-    huella      = '100'
-    aire        = '0'
-    sup         = '0'
-    vigilancia  = '90'
-    radiovig    = '440'
-    supaerea    = '0'
+    NOMBRE     = "Radar"
+    ICONO      = iconos['Radar']
+    DESC       = 'Medio antiaéreo con el mayor alcance de vigilancia.'
+    PRECIO     = 24
+    HUELLA     = 100
+    AIRE       = 0
+    SUP        = 0
+    VIGILANCIA = 90
+    RADIOVIG   = 440
+    SUPAEREA   = 0
 
 class Bateria(MedioAntiaereo):
     """Representa una batería anti-aérea"""
-    nombre      = "Batería"
-    precio      = PRECIO_BATERIA
-    icono       = iconos['Bateria']
-    info        = 'Único medio antiaéreo con capacidad de vigilancia.'
-    coste       = '90'
-    velocidad   = '0'
-    autonomia   = '0'
-    alcance     = '0'
-    huella      = '100'
-    aire        = '240'
-    sup         = '0'
-    vigilancia  = '60'
-    radiovig    = '260'
-    supaerea    = '0'
+    NOMBRE     = "Batería"
+    ICONO      = iconos['Bateria']
+    DESC       = 'Único medio antiaéreo con capacidad de vigilancia.'
+    PRECIO     = 90
+    HUELLA     = 100
+    AIRE       = 240
+    SUP        = 0
+    VIGILANCIA = 60
+    RADIOVIG   = 260
+    SUPAEREA   = 0
 
 class Inteligencia(MedioEstrategico):
     """Clase genérica para representar inteligencia"""
-    nombre      = "Inteligencia"
-    precio      = PRECIO_INTELIGENCIA
-    icono       = iconos['Inteligencia']
-    info        = 'Medio estratégico que permite obtener diversa información sobre el adversario.'
-    coste       = '-'
-    velocidad   = '-'
-    autonomia   = '-'
-    alcance     = '-'
-    huella      = '-'
-    aire        = '-'
-    sup         = '-'
-    vigilancia  = '-'
-    radiovig    = '-'
-    supaerea    = '-'
+    NOMBRE     = "Inteligencia"
+    PRECIO     = 50
+    ICONO      = iconos['Inteligencia']
+    DESC       = 'Medio estratégico que permite obtener diversa información sobre el adversario.'
 
 class Infraestructura(MedioEstrategico):
     """Clase genérica que representa una infraestructura"""
-    nombre      = "Infraestructura"
-    precio      = PRECIO_INFRAESTRUCTURA
-    icono       = iconos['Infraestructura']
-    info        = 'Medio estratégico que permite aumentar el nivel de las ciudades y las bases propias.'
-    coste       = '-'
-    velocidad   = '-'
-    autonomia   = '-'
-    alcance     = '-'
-    huella      = '-'
-    aire        = '-'
-    sup         = '-'
-    vigilancia  = '-'
-    radiovig    = '-'
-    supaerea    = '-'
+    NOMBRE     = "Infraestructura"
+    PRECIO     = 100
+    ICONO      = iconos['Infraestructura']
+    DESC       = 'Medio estratégico que permite aumentar el nivel de las ciudades y las bases propias.'
 
 class Casilla:
     ESCALA = 0.6
@@ -500,10 +451,9 @@ class Casilla:
     DIM_X  = RADIO * 3 ** 0.5
     DIM_Y  = RADIO * 1.5
 
-    def __init__(self, escenario, x, y):
-        self.esc = escenario
-        self.x   = x
-        self.y   = y
+    def __init__(self, esc, x, y):
+        self.x = x
+        self.y = y
 
         # Determinar jugador que tiene inicialmente la superioridad aerea
         if x < MAPA_DIM_J:
@@ -525,11 +475,11 @@ class Casilla:
 
         # Calcular posicion en el mapa y coordenadas de cada vertice
         self.centro = pygame.math.Vector2(Escenario.ORIGEN_X + self.DIM_X * (x + (y % 2) / 2), Escenario.ORIGEN_Y + self.DIM_Y * y)
-        self.verts = [self.centro + v for v in escenario.hex_vertices]
+        self.verts = [self.centro + v for v in esc.hex_vertices]
 
     def raton(self, pos):
         """Detecta si el ratón está sobre el botón"""
-        return pos.distance_squared_to(self.esc.origen + self.centro) <= self.RADIO ** 2
+        return pos.distance_squared_to(g_escenario.origen + self.centro) <= self.RADIO ** 2
 
     def colorear(self):
         """Determinar color"""
@@ -602,6 +552,26 @@ class Escenario:
         if self.casilla_pulsa:
             self.casilla_pulsa.pulsar(self.panel.surface)
 
+class Informacion:
+    """Representa el panel informativo"""
+    def __init__(self, panel):
+        self.panel = panel
+        self.texto = None
+
+    def escribir(self, texto):
+        """Cambiar el texto del panel"""
+        self.texto = texto
+
+    def borrar(self):
+        """Eliminar el texto del panel"""
+        self.texto = None
+
+    def dibujar(self):
+        """Renderizar el texto en pantalla"""
+        if self.texto:
+            x, y, w, h = self.panel.rect
+            texto_multilinea(self.texto, (x + 10, y + 30), 14, mono = True, max_ancho = w)
+
 # < -------------------------------------------------------------------------- >
 #                             CLASES DE LA INTERFAZ
 # < -------------------------------------------------------------------------- >
@@ -617,7 +587,7 @@ class Panel:
             color_borde = PANEL_BORDE_COLOR,  # Color del borde
             grosor      = PANEL_BORDE_GROSOR, # Grosor del borde
             radio       = PANEL_BORDE_RADIO,  # Radio de curvatura de las esquinas
-            surface     = pantalla            # Superficie donde dibujar panel
+            surface     = g_pantalla          # Superficie donde dibujar panel
         ):
         # Guardar parámetros del panel
         self.pos         = pos
@@ -647,24 +617,14 @@ class Panel:
 
 class Boton:
     """Clase que representa un boton clickable"""
-    def __init__(self, pos, texto=None, imagen=None, ayuda=None, info=None, coste=None, velocidad=None, autonomia=None, alcance=None, huella=None, aire=None, sup=None, vigilancia=None, radiovig=None, supaerea=None, accion=None, args=()):
+    def __init__(self, pos, texto=None, imagen=None, ayuda=None, info=None, accion=None, args=()):
         if not texto and not imagen:
             return
-        self.pos = pos            # Posición del botón en pantalla
-        self.ayuda = ayuda        # Pequeña descripción del botón, para cuando es seleccionado
-        self.info = info          # Descripción más detallada del botón seleccionado
-        self.coste = coste
-        self.velocidad = velocidad
-        self.autonomia = autonomia
-        self.alcance = alcance
-        self.huella = huella
-        self.aire = aire
-        self.sup = sup
-        self.vigilancia = vigilancia
-        self.radiovig = radiovig
-        self.supaerea = supaerea
+        self.pos    = pos         # Posición del botón en pantalla
+        self.ayuda  = ayuda       # Pequeña descripción del botón, para cuando es seleccionado
+        self.info   = info        # Descripción más detallada del botón seleccionado
         self.accion = accion      # Función a ejecutar si el botón es pulsado
-        self.args = args          # Argumentos que mandar a la función acción, si son necesarios
+        self.args   = args        # Argumentos que mandar a la función acción, si son necesarios
         self.indice = 0           # Pequeño número que aparezca en la esquina del botón
 
         # Calculamos el tamaño del boton
@@ -698,56 +658,32 @@ class Boton:
         else:
             self.panel.color = BOTON_COLOR_NORMAL
 
+        # Mostrar información en el panel informativo
+        global texto_ayuda
+        if self.selec:
+            g_info.escribir(self.info)
+            texto_ayuda = self.ayuda
+
         # Ejecutar acción si está pulsado
         if self.pulsado:
             self.accion(*self.args)
 
     def dibujar(self):
         """Renderizar el boton en pantalla"""
-        global texto_ayuda
-        global texto_info
-        global texto_coste
-        global texto_velocidad
-        global texto_autonomia
-        global texto_alcance
-        global texto_huella
-        global texto_aire
-        global texto_sup
-        global texto_vigilancia
-        global texto_radiovig
-        global texto_supaerea
-
         self.panel.dibujar()
-        pantalla.blit(self.imagen, self.pos)
+        g_pantalla.blit(self.imagen, self.pos)
         fuente = fuentes[AYUDA_TAMANO]
         x, y = self.pos
         w1, h1 = self.dim
         w2, h2 = fuente.size(str(self.indice))
         texto(str(self.indice), (x + w1 - 2, y + h1 - h2), AYUDA_TAMANO, (0, 0, 0), 'd')
-        if self.selec and self.ayuda:
-            texto_ayuda = self.ayuda
-        if self.selec and self.info:
-            texto_info = self.info
-        if self.selec and self.coste:
-            texto_coste = self.coste
-        if self.selec and self.velocidad:
-            texto_velocidad = self.velocidad
-        if self.selec and self.autonomia:
-            texto_autonomia = self.autonomia
-        if self.selec and self.alcance:
-            texto_alcance = self.alcance
-        if self.selec and self.huella:
-            texto_huella = self.huella
-        if self.selec and self.aire:
-            texto_aire = self.aire
-        if self.selec and self.sup:
-            texto_sup = self.sup
-        if self.selec and self.vigilancia:
-            texto_vigilancia = self.vigilancia
-        if self.selec and self.radiovig:
-             texto_radiovig = self.radiovig
-        if self.selec and self.supaerea:
-            texto_supaerea = self.supaerea
+
+class Fase(enum.IntEnum):
+    """Representa cada posible fase del juego"""
+    PANTALLAZO = 1
+    REGLAS     = 2
+    TURNOS     = 3
+    FINAL      = 4
 
 # < -------------------------------------------------------------------------- >
 #                         FUNCIONES AUXILIARES INTERFAZ
@@ -763,21 +699,8 @@ def ayuda():
     pos = (x - 80, y + 20)
     fuente = fuentes[AYUDA_TAMANO]
     dim = fuente.size(texto_ayuda)
-    pygame.draw.rect(pantalla, AYUDA_COLOR, pos + dim)
+    pygame.draw.rect(g_pantalla, AYUDA_COLOR, pos + dim)
     texto(texto_ayuda, pos, AYUDA_TAMANO)
-    texto(texto_info, (sep*5, 510), 16)
-    texto(texto_coste, (40, 580), 16)
-    texto(texto_velocidad, (160, 580), 16)
-    texto(texto_autonomia, (310, 580), 16)
-    texto(texto_alcance, (440, 580), 16)
-    texto(texto_huella, (560, 580), 16)
-    texto(texto_aire, (680, 580), 16)
-    texto(texto_sup, (800, 580), 16)
-    texto(texto_vigilancia, (930, 580), 16)
-    texto(texto_radiovig, (1060, 580), 16)
-    texto(texto_supaerea, (1190, 580), 16)
-    texto('  COSTE              VELOCIDAD           AUTONOMÍA           ALCANCE             HUELLA             AIRE-AIRE           AIRE-SUP             VIGILANCIA          RADIO VIGIL.         SUP.AÉREA', (sep*3, 550), 16, alineado = 'l' )
-
 
 def texto(
         cadena,
@@ -788,7 +711,8 @@ def texto(
         negrita   = False,
         cursiva   = False,
         subrayado = False,
-        surface   = pantalla
+        mono      = False,
+        surface   = g_pantalla
     ):
     """Escribir un texto en la pantalla"""
     # Aseguramos que el tamaño de fuente deseado esta disponible
@@ -796,7 +720,7 @@ def texto(
         tamaño = TEXTO_TAMANO
 
     # Ajustamos la posicion para respetar el alineado
-    fuente = fuentes[tamaño]
+    fuente = fuentes_mono[tamaño] if mono else fuentes[tamaño]
     longitud = fuente.size(cadena)[0]
     x = posicion[0] - (longitud if alineado == 'd' else longitud / 2 if alineado == 'c' else 0)
     y = posicion[1]
@@ -845,41 +769,24 @@ def dividir_texto(texto, fuente, max_ancho):
 def texto_multilinea(
         cadena,
         posicion,
-        tamaño=TEXTO_TAMANO,
-        color=COLOR_TEXTO,
-        alineado='i',
-        negrita=False,
-        cursiva=False,
-        subrayado=False,
-        surface=None,
-        max_ancho=200
+        tamaño    = TEXTO_TAMANO,
+        color     = COLOR_TEXTO,
+        alineado  = 'i',
+        negrita   = False,
+        cursiva   = False,
+        subrayado = False,
+        mono      = False,
+        surface   = g_pantalla,
+        max_ancho = 200
     ):
     """Permite dividir el texto, producir saltos de línea y tabulaciones"""
-    pygame.font.init()
-    # Cargar la fuente "Century Gothic"
-    fuente = pygame.font.SysFont('Century Gothic', tamaño)
-    fuente.set_bold(negrita)
-    fuente.set_italic(cursiva)
-    fuente.set_underline(subrayado)
-
-    # Asegurarse de que 'cadena' sea una cadena de texto
-    if not isinstance(cadena, str):
-        cadena = str(cadena)
-
-    lineas = dividir_texto(cadena.replace('\t', '    '), fuente, max_ancho)
+    if not tamaño in TEXTO_TAMANOS:
+        tamaño = TEXTO_TAMANO
+    fuente = fuentes[tamaño]
     x, y = posicion
-
+    lineas = dividir_texto(cadena.replace('\t', '    '), fuente, max_ancho)
     for linea in lineas:
-        texto_renderizado = fuente.render(linea, True, color)
-        texto_rect = texto_renderizado.get_rect()
-
-        if alineado == 'c':
-            texto_rect.center = (x + max_ancho // 2, y)
-        elif alineado == 'i':
-            texto_rect.topleft = (x, y)
-        elif alineado == 'd':
-            texto_rect.topright = (x + max_ancho, y)
-        surface.blit(texto_renderizado, texto_rect)
+        texto(linea, (x, y), tamaño, color, alineado, negrita, cursiva, subrayado, surface)
         y += fuente.get_height()
 
 
@@ -890,13 +797,13 @@ def texto_multilinea(
 def comprar(medio):
     """"Ejecuta la acción de comprar un producto"""
     global credito
-    if credito < medio.precio:
+    if credito < medio.PRECIO:
         sonidos['error'].play()
         return
     sonidos['dinero'].play()
     inventario[medio] += 1
     botones[medio].indice += 1
-    credito -= medio.precio
+    credito -= medio.PRECIO
 
 def analizar_raton(click):
     """Según la posición del ratón, ver si tenemos que realizar alguna acción"""
@@ -909,19 +816,11 @@ def analizar_raton(click):
         boton.pulsado = sel and click
 
     # Seleccionar celdas en el escenario y demás
-    escenario.raton(pos, click)
+    g_escenario.raton(pos, click)
 
-def actualizar_pantallazo():
-    """Dibujar pantallazo inicial"""
-    x = (pantalla.get_width() - pantallazo.get_width()) / 2
-    y = (pantalla.get_height() - pantallazo.get_height()) / 2
-    pantalla.blit(pantallazo, (x, y))
-
-def actualizar_pantallazo_reglas():
-    """Dibujar pantallazo reglas"""
-    x = (pantalla.get_width() - pantallazo_reglas.get_width()) / 2
-    y = (pantalla.get_height() - pantallazo_reglas.get_height()) / 2
-    pantalla.blit(pantallazo_reglas, (x, y))
+def actualizar_fondo():
+    """Dibujar el fondo (primera capa del display)"""
+    g_pantalla.fill(COLOR_FONDO)
 
 def actualizar_paneles():
     """Actualizar el contenido de cada panel"""
@@ -935,13 +834,53 @@ def actualizar_textos():
     """Actualizar textos en pantalla"""
     texto(f"Crédito: {credito}M", (ANCHURA * ANCHURA_JUEGO + sep, sep), 24)
     texto('Tienda', (ANCHURA * (ANCHURA_JUEGO + 1) / 2, 65), 24, alineado = 'c', subrayado = True)
+    g_info.dibujar()
 
 def actualizar_escenario():
-    escenario.dibujar()
+    g_escenario.dibujar()
 
 def siguiente_fotograma():
-    pygame.display.flip()
-    clock.tick(FPS)
+    """Avanzar fotograma"""
+    pygame.display.flip() # Renderizar fotograma en pantalla y cambiar buffer
+    clock.tick(FPS)       # Avanzar reloj y limitar frecuencia de fotogramas
+
+def siguiente_fase():
+    """Avanzar a la siguiente fase del juego"""
+    global g_fase
+    if g_fase < Fase.FINAL:
+        g_fase += 1
+    else:
+        g_fase = Fase.PANTALLAZO
+
+def resetear_variables():
+    """Inicializar variables que quieren refrescarse cada fotograma"""
+    global texto_ayuda
+    texto_ayuda = None
+    g_info.borrar()
+
+def actualizar_fase_pantallazo():
+    """Dibujar pantallazo inicial"""
+    x = (g_pantalla.get_width() - pantallazo.get_width()) / 2
+    y = (g_pantalla.get_height() - pantallazo.get_height()) / 2
+    g_pantalla.blit(pantallazo, (x, y))
+
+def actualizar_fase_reglas():
+    """Dibujar pantallazo reglas"""
+    x = (g_pantalla.get_width() - pantallazo_reglas.get_width()) / 2
+    y = (g_pantalla.get_height() - pantallazo_reglas.get_height()) / 2
+    g_pantalla.blit(pantallazo_reglas, (x, y))
+
+def actualizar_fase_turnos(click):
+    """Actualizar estado en la fase de turnos"""
+    # Reaccionar a las acciones del raton
+    analizar_raton(click)
+
+    # Renderizar fotograma en pantalla
+    actualizar_paneles()
+    actualizar_textos()
+    actualizar_escenario()
+    if texto_ayuda:
+        ayuda()
 
 # < -------------------------------------------------------------------------- >
 #                           INICIALIZACIÓN DEL JUEGO
@@ -961,7 +900,7 @@ inventario = { producto: 0 for producto in productos }
 # Configurar paneles
 sep = PANEL_SEPARACION
 paneles = {
-    'gráficas':    Panel((sep, sep), (ANCHURA * ANCHURA_JUEGO - 1.5 * sep, ALTURA * ALTURA_JUEGO - 1.5 * sep), 'gráficas'),
+    'escenario':   Panel((sep, sep), (ANCHURA * ANCHURA_JUEGO - 1.5 * sep, ALTURA * ALTURA_JUEGO - 1.5 * sep), 'escenario'),
     'acciones':    Panel((ANCHURA * ANCHURA_JUEGO + sep / 2, sep), (ANCHURA * ANCHURA_ACCIONES - 1.5 * sep, ALTURA * ALTURA_ACCIONES - 1.5 * sep)),
     'informacion': Panel((sep, ALTURA * ALTURA_JUEGO + sep / 2), (ANCHURA - 2 * sep, ALTURA * ALTURA_INFORMACION - 1.5 * sep), 'información')
 }
@@ -993,13 +932,19 @@ y0 = 100
 x = x0
 y = y0
 for producto in productos:
-    botones[producto] = Boton((x, y), imagen=producto.icono, ayuda=producto.ayuda()['help'], info=producto.ayuda()['info'], coste=producto.ayuda()['coste'], velocidad=producto.ayuda()['velocidad'], autonomia=producto.ayuda()['autonomia'], alcance=producto.ayuda()['alcance'], huella=producto.ayuda()['huella'], aire=producto.ayuda()['aire'], sup=producto.ayuda()['sup'], vigilancia=producto.ayuda()['vigilancia'], radiovig=producto.ayuda()['radiovig'], supaerea=producto.ayuda()['supaerea'], accion=comprar, args=(producto,))
+    botones[producto] = Boton((x, y), imagen=producto.ICONO, ayuda=producto.ayuda(), info=producto.info(), accion=comprar, args=(producto,))
     x = x + botones[producto].dim[0] + 5 if i % cols < cols - 1 else x0
     y += botones[producto].dim[1] + 5 if i % cols == cols - 1 else 0
     i += 1
 
-# Inicializar escenario
-escenario = Escenario(paneles['gráficas'])
+# Inicializar escenario (casillas y su contenido)
+g_escenario = Escenario(paneles['escenario'])
+
+# Inicializar panel informativo
+g_info = Informacion(paneles['informacion'])
+
+# Inicializar juego
+g_fase = Fase.PANTALLAZO
 
 # < -------------------------------------------------------------------------- >
 #                          BUCLE PRINCIPAL DEL JUEGO
@@ -1009,34 +954,30 @@ while True:
     # Escanear eventos (pulsaciones de teclas, movimientos de ratón, etc)
     cerrar = False
     click = False
-    texto_ayuda= None
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             cerrar = True
         elif event.type == pygame.MOUSEBUTTONDOWN:
             click = True
-    if (cerrar):
+    if cerrar:
         pygame.quit()
         break
 
-    # Colorear fondo
-    pantalla.fill(COLOR_FONDO)
+    resetear_variables() # Inicializar estado
+    actualizar_fondo()   # Colorear fondo
 
-    if MOSTRAR_PANTALLAZO and tiempo() <= 1000 * PANTALLAZO_TIEMPO:
-        # Pantallazo inicial
-        actualizar_pantallazo()
-    elif MOSTRAR_REGLAS and 1000 * PANTALLAZO_TIEMPO <= tiempo() <= 1000 * (PANTALLAZO_TIEMPO + PANTALLAZO_REGLAS_TIEMPO):
-        # Pantallazo de reglas
-        actualizar_pantallazo_reglas()
+    # Ejecutar cada fase del juego
+    if g_fase == Fase.PANTALLAZO:       # Pantallazo inicial
+        actualizar_fase_pantallazo()
+        if click:
+            siguiente_fase()
+    elif g_fase == Fase.REGLAS:         # Pantallazo de reglas
+        actualizar_fase_reglas()
+        if click:
+            siguiente_fase()
+    elif g_fase == Fase.TURNOS:         # Fase central del juego
+        actualizar_fase_turnos(click)
     else:
-        # Reaccionar a las acciones del raton
-        analizar_raton(click)
-
-        # Renderizar fotograma en pantalla
-        actualizar_paneles()
-        actualizar_textos()
-        actualizar_escenario()
-        if texto_ayuda:
-            ayuda()
+        pass
 
     siguiente_fotograma()

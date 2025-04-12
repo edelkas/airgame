@@ -9,6 +9,7 @@ Clases:
 Estéticos:
   - Alineamiento de varias partes del código.
   - Recortado partes en blanco de los sonidos.
+  - Todas las variables globales prefijadas con "g_" para distinguirlas más fácilmente.
 
 Organización código:
   - Las constantes mejor definirlas arriba (no en medio del código) y sean datos primitivos.
