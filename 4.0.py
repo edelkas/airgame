@@ -30,7 +30,6 @@
 import os
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
 import pygame
-
 import random
 
 
@@ -62,6 +61,11 @@ PANTALLA_MODIFICARDIMENSION     = False          # Para poder modificar la dimen
 FPS                             = 60             # Fotogramas por segundo
 COLOR_FONDO                     = (96, 130, 182) # Color RGB del fondo de pantalla
 
+# Configuraciones iniciales del programa (útil para streamlinear la programación)
+MUSICA_REPRODUCIR  = False # Activar o desactivar la música
+MOSTRAR_PANTALLAZO = False # Mostrar o saltar pantallazo inicial
+MOSTRAR_REGLAS     = False # Mostrar o saltan pantallazo de reglas
+
 # Propiedades del texto
 COLOR_TEXTO        = (0, 0, 0)                  # Color RGB por defecto del texto
 TEXTO_FUENTE       = "CENTURY GOTHIC"           # Fuente de los textos
@@ -90,19 +94,37 @@ BOTON_COLOR_PULSA  = (255, 255, 255) # Color del fondo cuando está pulsado
 BOTON_TAMANO_LETRA = 16              # Tamaño de la letra
 
 # Recursos (sonidos, imágenes...)
-MUSICA_FONDO = "topgunmusic.ogg"
-IMAGEN_FONDO = "imagenairgame.png"
+MUSICA_FONDO  = "topgunmusic.ogg"
+IMAGEN_FONDO  = "imagenairgame.png"
+SONIDO_DINERO = "cajaregistradora.ogg"
+SONIDO_ERROR  = "error.ogg"
 
 # Pantallazo
 PANTALLAZO_COLOR_FONDO = '#325320' # Color de fondo del panel del pantallazo
 PANTALLAZO_COLOR_TEXTO = '#000000' # Color de fondo del panel del pantallazo
-PANTALLAZO_TIEMPO = 5000           # Tiempo que dura el pantallazo inicial en ms
+PANTALLAZO_TIEMPO = 5              # Tiempo que dura el pantallazo inicial en seg
 
 # Pantallazo reglas
 PANTALLAZO_REGLAS_COLOR_FONDO = (229, 228, 226) # Color de fondo del panel del pantallazo reglas
 PANTALLAZO_REGLAS_COLOR_TEXTO = '#000000'       # Color de fondo del panel del pantallazo reglas
-PANTALLAZO_REGLAS_TIEMPO = 10000                # Tiempo en el que desaparecera el pantallazo reglas en ms
+PANTALLAZO_REGLAS_TIEMPO = 5                    # Tiempo que dura el pantallazo de reglas en seg
 
+# Escenario
+MAPA_DIM_X = 25 # Anchura del mapa en casillas
+MAPA_DIM_Y = 15 # Altura del mapa en casillas
+MAPA_DIM_J = 11 # Número de columnas en propiedad inicial de cada jugador
+MAPA_COLOR_CASILLA_NEUTRO = "#f2f2f2" # Color de casilla sin superioridad aerea
+MAPA_COLOR_CASILLA_J1     = "#bdd7ee" # Color de casilla con superioridad aerea de J1
+MAPA_COLOR_CASILLA_J2     = "#f8cbad" # Color de casilla con superioridad aerea de J2
+MAPA_COLOR_CASILLA_J1_F   = "#2e75b6" # Color de casilla con supremacia aerea de J1
+MAPA_COLOR_CASILLA_J2_F   = "#c55a11" # Color de casilla con supremacia aerea de J2
+MAPA_COLOR_BASE           = "#00b050" # Color del borde de una casilla con base aérea
+MAPA_COLOR_CIUDAD         = "#000000" # Color del borde de una casilla con ciudad
+MAPA_COLOR_CAPITAL        = "#c09200" # Color del borde de la casilla capital
+MAPA_BORDE_CASILLA = 0.25 # Proporcion de anchura de la casilla que supone el borde, en caso de tener
+
+# Reglas
+MULTIPLICADOR_SUPREMACIA = 2 # Ratio entre superioridad y supremacia aerea
 
 indice_reglas = 0
 REGLAS_LISTA = [
@@ -240,8 +262,6 @@ texto_supaerea = None
 # Cargar recursos
 pygame.mixer.init()
 pygame.mixer.music.load(MUSICA_FONDO)
-SONIDO_DINERO = pygame.mixer.Sound("cajaregistradora.ogg")
-SONIDO_ERROR = pygame.mixer.Sound("error.ogg")
 imagen_pantallazo = cargar_imagen(IMAGEN_FONDO)
 fuentes = { tam: pygame.font.SysFont(TEXTO_FUENTE, tam) for tam in TEXTO_TAMANOS}
 iconos = {
@@ -254,6 +274,10 @@ iconos = {
     'Bateria':         cargar_imagen('icono_bateria.png'),
     'Inteligencia':    cargar_imagen('icono_inteligencia.png'),
     'Infraestructura': cargar_imagen('icono_infraestructura.png'),
+}
+sonidos = {
+    'dinero': pygame.mixer.Sound(SONIDO_DINERO),
+    'error':  pygame.mixer.Sound(SONIDO_ERROR),
 }
 
 # < -------------------------------------------------------------------------- >
@@ -458,6 +482,60 @@ class Infraestructura(MedioEstrategico):
     radiovig    = '-'
     supaerea    = '-'
 
+class Casilla:
+    ESCALA = 0.6
+    BORDE = 0.9
+    RADIO  = min(ESCALA * ANCHURA * ANCHURA_JUEGO / MAPA_DIM_X, ESCALA * ALTURA * ALTURA_JUEGO / MAPA_DIM_Y)
+    DIM_X  = RADIO * 3 ** 0.5
+    DIM_Y  = RADIO * 1.5
+
+    def __init__(self, escenario, x, y, sup, supCas):
+        self.esc    = escenario
+        self.x      = x
+        self.y      = y
+        self.supCas = supCas
+        self.sup    = sup
+
+        ox = (ANCHURA * ANCHURA_JUEGO - MAPA_DIM_X * self.DIM_X) / (2 * self.DIM_X)
+        oy = (ALTURA * ALTURA_JUEGO - MAPA_DIM_Y * self.DIM_Y) / (self.DIM_Y)
+        self.centro    = pygame.math.Vector2(self.DIM_X * (x + ox + (y % 2) / 2), self.DIM_Y * (y + oy))
+        print(self.centro)
+        self.verts     = [self.centro + v for v in escenario.hex_vertices]
+        
+    
+    def dibujar(self, surface):
+        # Determinar color
+        if self.sup <= -MULTIPLICADOR_SUPREMACIA * self.supCas:
+            color = MAPA_COLOR_CASILLA_J2_F
+        elif self.sup <= -self.supCas:
+            color = MAPA_COLOR_CASILLA_J2
+        elif self.sup < self.supCas:
+            color = MAPA_COLOR_CASILLA_NEUTRO
+        elif self.sup < MULTIPLICADOR_SUPREMACIA * self.supCas:
+            color = MAPA_COLOR_CASILLA_J1
+        else:
+            color = MAPA_COLOR_CASILLA_J1_F
+
+        # Determinar dimensiones (poner borde de anchura MAPA_BORDE_CASILLA)
+        pygame.draw.polygon(surface, color, self.verts)
+        
+class Escenario:
+
+    def __init__(self, surface):
+        self.surface = surface
+
+        # Calcular las dimensiones de las casillas
+        hex_vert = pygame.math.Vector2.from_polar((Casilla.RADIO * Casilla.BORDE, 90))
+        self.hex_vertices = [hex_vert.rotate(60 * i) for i in range(6)]
+
+        # Array de casillas
+        self.casillas = [[Casilla(self, x, y, 25, 20) for y in range(MAPA_DIM_Y)] for x in range(MAPA_DIM_X)]
+    
+    def dibujar(self):
+        for columna in self.casillas:
+            for casilla in columna:
+                casilla.dibujar(self.surface)
+
 # < -------------------------------------------------------------------------- >
 #                             CLASES DE LA INTERFAZ
 # < -------------------------------------------------------------------------- >
@@ -610,7 +688,8 @@ class Boton:
 # < -------------------------------------------------------------------------- >
 
 def tiempo():
-    return pygame.time.get_ticks()
+    """Milisegundos (entero) desde inicio del programa"""
+    return round(pygame.time.get_ticks())
 
 def ayuda():
     """Muestra un pequeño rectángulo con información de ayuda y las info asociada a cada producto cuando el ratón esta sobre su botón"""
@@ -738,9 +817,6 @@ def texto_multilinea(
         y += fuente.get_height()
 
 
-
-
-
 # < -------------------------------------------------------------------------- >
 #                       ACTUALIZACION DEL ESTADO DEL JUEGO
 # < -------------------------------------------------------------------------- >
@@ -749,9 +825,9 @@ def comprar(medio):
     """"Ejecuta la acción de comprar un producto"""
     global credito
     if credito < medio.precio:
-        SONIDO_ERROR.play()
+        sonidos['error'].play()
         return
-    SONIDO_DINERO.play()
+    sonidos['dinero'].play()
     inventario[medio] += 1
     botones[medio].indice += 1
     credito -= medio.precio
@@ -791,6 +867,9 @@ def actualizar_textos():
     texto(f"Crédito: {credito}M", (ANCHURA * ANCHURA_JUEGO + sep, sep), 24)
     texto('Tienda', (ANCHURA * (ANCHURA_JUEGO + 1) / 2, 65), 24, alineado = 'c', subrayado = True)
 
+def actualizar_escenario():
+    escenario.dibujar()
+
 def siguiente_fotograma():
     pygame.display.flip()
     clock.tick(FPS)
@@ -800,7 +879,8 @@ def siguiente_fotograma():
 # < -------------------------------------------------------------------------- >
 
 # Comenzar musica
-pygame.mixer.music.play(-1)
+if MUSICA_REPRODUCIR:
+    pygame.mixer.music.play(-1)
 
 # Inicializar variables básicas
 nombre  = NOMBRE_DEFECTO
@@ -812,7 +892,7 @@ inventario = { producto: 0 for producto in productos }
 # Configurar paneles
 sep = PANEL_SEPARACION
 paneles = {
-    'gráficas':        Panel((sep, sep), (ANCHURA * ANCHURA_JUEGO - 1.5 * sep, ALTURA * ALTURA_JUEGO - 1.5 * sep), 'gráficas'),
+    'gráficas':    Panel((sep, sep), (ANCHURA * ANCHURA_JUEGO - 1.5 * sep, ALTURA * ALTURA_JUEGO - 1.5 * sep), 'gráficas'),
     'acciones':    Panel((ANCHURA * ANCHURA_JUEGO + sep / 2, sep), (ANCHURA * ANCHURA_ACCIONES - 1.5 * sep, ALTURA * ALTURA_ACCIONES - 1.5 * sep)),
     'informacion': Panel((sep, ALTURA * ALTURA_JUEGO + sep / 2), (ANCHURA - 2 * sep, ALTURA * ALTURA_INFORMACION - 1.5 * sep), 'información')
 }
@@ -849,6 +929,9 @@ for producto in productos:
     y += botones[producto].dim[1] + 5 if i % cols == cols - 1 else 0
     i += 1
 
+# Inicializar escenario
+escenario = Escenario(paneles['gráficas'].surface)
+
 # < -------------------------------------------------------------------------- >
 #                          BUCLE PRINCIPAL DEL JUEGO
 # < -------------------------------------------------------------------------- >
@@ -870,26 +953,21 @@ while True:
     # Colorear fondo
     pantalla.fill(COLOR_FONDO)
 
-    # Si estamos en el pantallazo, no hacer nada mas
-    if tiempo() <= PANTALLAZO_TIEMPO:
+    if MOSTRAR_PANTALLAZO and tiempo() <= 1000 * PANTALLAZO_TIEMPO:
+        # Pantallazo inicial
         actualizar_pantallazo()
-        siguiente_fotograma()
-        continue
-
-    # Si estamos en el pantallazo reglas, no hacer nada mas
-    if  PANTALLAZO_TIEMPO <= tiempo() <= PANTALLAZO_REGLAS_TIEMPO:
+    elif MOSTRAR_REGLAS and 1000 * PANTALLAZO_TIEMPO <= tiempo() <= 1000 * (PANTALLAZO_TIEMPO + PANTALLAZO_REGLAS_TIEMPO):
+        # Pantallazo de reglas
         actualizar_pantallazo_reglas()
-        siguiente_fotograma()
-        continue
+    else:
+        # Reaccionar a las acciones del raton
+        analizar_raton(click)
 
-    # Reaccionar a las acciones del raton
-    analizar_raton(click)
-
-    # Renderizar fotograma en pantalla
-    actualizar_paneles()
-    actualizar_textos()
-    if texto_ayuda:
-        ayuda()
-
+        # Renderizar fotograma en pantalla
+        actualizar_paneles()
+        actualizar_textos()
+        actualizar_escenario()
+        if texto_ayuda:
+            ayuda()
 
     siguiente_fotograma()

@@ -1,2 +1,14 @@
+Clases:
+  - Añadida la clase casilla, que contiene toda la información necesaria de una casilla, y
+    se encarga de dibujarla.
+
 Estéticos:
   - Alineamiento de varias partes del código.
+  - Recortado partes en blanco de los sonidos.
+
+Organización código:
+  - Las constantes mejor definirlas arriba (no en medio del código) y sean datos primitivos.
+    Por ejemplo, en lugar de que los sonidos sean una constante, la constante es el nombre
+    del fichero, y luego simplemente se define una variable que es un diccionario de sonidos.
+  - Añadido algunas configuraciones que permiten desarrollar más cómodamente (e.g. desactivar
+    pantallazo, música, etc.).
