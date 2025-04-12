@@ -121,6 +121,7 @@ MAPA_COLOR_CASILLA_J2_F   = "#c55a11" # Color de casilla con supremacia aerea de
 MAPA_COLOR_BASE           = "#00b050" # Color del borde de una casilla con base aérea
 MAPA_COLOR_CIUDAD         = "#000000" # Color del borde de una casilla con ciudad
 MAPA_COLOR_CAPITAL        = "#c09200" # Color del borde de la casilla capital
+MAPA_COLOR_BORDE          = "#9900cc" # Color del borde de la casilla actualmente seleccionada
 MAPA_BORDE_CASILLA = 0.25 # Proporcion de anchura de la casilla que supone el borde, en caso de tener
 
 # Sistema de puntos y superioridad aerea
@@ -520,15 +521,18 @@ class Casilla:
             self.sup = -self.supCas
         else:
             self.sup = 0
+        self.colorear()
 
         # Calcular posicion en el mapa y coordenadas de cada vertice
-        ox = (ANCHURA * ANCHURA_JUEGO - MAPA_DIM_X * self.DIM_X) / (2 * self.DIM_X)
-        oy = (ALTURA * ALTURA_JUEGO - MAPA_DIM_Y * self.DIM_Y) / (self.DIM_Y)
-        self.centro = pygame.math.Vector2(self.DIM_X * (x + ox + (y % 2) / 2), self.DIM_Y * (y + oy))
+        self.centro = pygame.math.Vector2(Escenario.ORIGEN_X + self.DIM_X * (x + (y % 2) / 2), Escenario.ORIGEN_Y + self.DIM_Y * y)
         self.verts = [self.centro + v for v in escenario.hex_vertices]
 
-    def dibujar(self, surface):
-        # Determinar color
+    def raton(self, pos):
+        """Detecta si el ratón está sobre el botón"""
+        return pos.distance_squared_to(self.esc.origen + self.centro) <= self.RADIO ** 2
+
+    def colorear(self):
+        """Determinar color"""
         if self.sup <= -MULTIPLICADOR_SUPREMACIA * self.supCas:
             color = MAPA_COLOR_CASILLA_J2_F
         elif self.sup <= -self.supCas:
@@ -539,14 +543,27 @@ class Casilla:
             color = MAPA_COLOR_CASILLA_J1
         else:
             color = MAPA_COLOR_CASILLA_J1_F
+        self.color = pygame.Color(color)
 
-        # Determinar dimensiones (poner borde de anchura MAPA_BORDE_CASILLA)
-        pygame.draw.polygon(surface, color, self.verts)
+    def dibujar(self, surface):
+        """Dibujar casilla en pantalla"""
+        pygame.draw.polygon(surface, self.color, self.verts)
+
+    def seleccionar(self, surface):
+        """Destacar visualmente la casilla cuando el raton pasa por encima"""
+        pygame.draw.polygon(surface, MAPA_COLOR_BORDE, self.verts, 2)
+
+    def pulsar(self, surface):
+        """Destacar visualmente la casilla cuando el raton hace click"""
+        pygame.draw.polygon(surface, MAPA_COLOR_BORDE, self.verts, 4)
 
 class Escenario:
+    ORIGEN_X = (ANCHURA * ANCHURA_JUEGO - MAPA_DIM_X * Casilla.DIM_X) / 2
+    ORIGEN_Y = ALTURA * ALTURA_JUEGO - MAPA_DIM_Y * Casilla.DIM_Y
 
-    def __init__(self, surface):
-        self.surface = surface
+    def __init__(self, panel):
+        self.panel = panel
+        self.origen = pygame.Vector2(panel.pos)
 
         # Calcular las dimensiones de las casillas
         hex_vert = pygame.math.Vector2.from_polar((Casilla.RADIO * Casilla.BORDE, 90))
@@ -560,10 +577,30 @@ class Escenario:
             for casilla in random.sample(casillas, supremacia):
                 casilla.sup *= 2
 
-    def dibujar(self):
+        # Casillas especiales
+        self.casilla_sobre = None # Casilla actualmente seleccionada con el raton
+        self.casilla_pulsa = None # Casilla actualmente pulsada por el raton
+
+    def raton(self, pos, click):
+        """Seleccionar casillas en funcion del raton"""
+        pos_vec = pygame.Vector2(pos)
+        self.casilla_sobre = None
         for columna in self.casillas:
             for casilla in columna:
-                casilla.dibujar(self.surface)
+                if casilla.raton(pos_vec):
+                    self.casilla_sobre = casilla
+                    if click:
+                        self.casilla_pulsa = casilla
+
+    def dibujar(self):
+        """Dibujar todas las celdas en pantalla"""
+        for columna in self.casillas:
+            for casilla in columna:
+                casilla.dibujar(self.panel.surface)
+        if self.casilla_sobre:
+            self.casilla_sobre.seleccionar(self.panel.surface)
+        if self.casilla_pulsa:
+            self.casilla_pulsa.pulsar(self.panel.surface)
 
 # < -------------------------------------------------------------------------- >
 #                             CLASES DE LA INTERFAZ
@@ -871,6 +908,9 @@ def analizar_raton(click):
         boton.selec = sel
         boton.pulsado = sel and click
 
+    # Seleccionar celdas en el escenario y demás
+    escenario.raton(pos, click)
+
 def actualizar_pantallazo():
     """Dibujar pantallazo inicial"""
     x = (pantalla.get_width() - pantallazo.get_width()) / 2
@@ -959,7 +999,7 @@ for producto in productos:
     i += 1
 
 # Inicializar escenario
-escenario = Escenario(paneles['gráficas'].surface)
+escenario = Escenario(paneles['gráficas'])
 
 # < -------------------------------------------------------------------------- >
 #                          BUCLE PRINCIPAL DEL JUEGO
