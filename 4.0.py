@@ -54,12 +54,12 @@ PRECIO_INTELIGENCIA     =  50
 PRECIO_INFRAESTRUCTURA  = 100
 
 # Características generales de la interfaz
-ANCHURA                         = 1280           # Anchura de la ventana en pixeles
-ALTURA                          = 720            # Altura de la ventana en pixeles
-PANTALLA_COMPLETA               = False          # Para abrir el juego en ventana completa
-PANTALLA_MODIFICARDIMENSION     = False          # Para poder modificar la dimensión de la ventana
-FPS                             = 60             # Fotogramas por segundo
-COLOR_FONDO                     = (96, 130, 182) # Color RGB del fondo de pantalla
+ANCHURA                         = 1280      # Anchura de la ventana en pixeles
+ALTURA                          = 720       # Altura de la ventana en pixeles
+PANTALLA_COMPLETA               = False     # Para abrir el juego en ventana completa
+PANTALLA_MODIFICARDIMENSION     = False     # Para poder modificar la dimensión de la ventana
+FPS                             = 60        # Fotogramas por segundo
+COLOR_FONDO                     = "#cccccc" # Color RGB del fondo de pantalla
 
 # Configuraciones iniciales del programa (útil para streamlinear la programación)
 MUSICA_REPRODUCIR  = False # Activar o desactivar la música
@@ -73,11 +73,11 @@ TEXTO_TAMANOS      = [16, 20, 24, 36, 72, 180]  # Tamaños de fuente que se usar
 TEXTO_TAMANO       = 24                         # Tamaño de fuente por defecto
 
 # Propiedades generales de todos los paneles, por defecto
-PANEL_BORDE_COLOR  = (54, 69, 79)    # Color del borde de los paneles
-PANEL_INT_COLOR    = (229, 228, 226) # Color del interior de los paneles
-PANEL_BORDE_GROSOR = 2               # Grosor del borde (0 = sin borde)
-PANEL_BORDE_RADIO  = 5               # Radio de las esquinas circulares
-PANEL_SEPARACION   = 5               # Separacion entre paneles
+PANEL_BORDE_COLOR  = "#006600" # Color del borde de los paneles
+PANEL_INT_COLOR    = "#e6ffe6" # Color del interior de los paneles
+PANEL_BORDE_GROSOR = 2         # Grosor del borde (0 = sin borde)
+PANEL_BORDE_RADIO  = 5         # Radio de las esquinas circulares
+PANEL_SEPARACION   = 5         # Separacion entre paneles
 
 # Dimensiones de los 3 paneles principales (en proporción)
 ANCHURA_JUEGO       = 0.86
@@ -122,6 +122,16 @@ MAPA_COLOR_BASE           = "#00b050" # Color del borde de una casilla con base 
 MAPA_COLOR_CIUDAD         = "#000000" # Color del borde de una casilla con ciudad
 MAPA_COLOR_CAPITAL        = "#c09200" # Color del borde de la casilla capital
 MAPA_BORDE_CASILLA = 0.25 # Proporcion de anchura de la casilla que supone el borde, en caso de tener
+
+# Sistema de puntos y superioridad aerea
+SUP_NORMAL      = 20  # Coeficiente de sup aerea en una casilla normal
+SUP_CIUDAD      = 40  # Coeficiente de sup aerea en una casilla ciudad (inicial)
+SUP_CIUDAD_INC  = 5   # Coeficiente de sup aerea en una casilla ciudad (incremento por nivel)
+SUP_BASE        = 60  # Coeficiente de sup aerea en una casilla base (inicial)
+SUP_BASE_INC    = 5   # Coeficiente de sup aerea en una casilla base (incremento por nivel)
+SUP_CAPITAL     = 100 # Coeficiente de sup aerea en una casilla capital (inicial)
+SUP_CAPITAL_INC = 5   # Coeficiente de sup aerea en una casilla capital (incremento por nivel)
+SUP_INICIAL     = 0.1 # Proporción de casillas iniciales con supremacia (aleatorias)
 
 # Reglas
 MULTIPLICADOR_SUPREMACIA = 2 # Ratio entre superioridad y supremacia aerea
@@ -489,20 +499,34 @@ class Casilla:
     DIM_X  = RADIO * 3 ** 0.5
     DIM_Y  = RADIO * 1.5
 
-    def __init__(self, escenario, x, y, sup, supCas):
-        self.esc    = escenario
-        self.x      = x
-        self.y      = y
-        self.supCas = supCas
-        self.sup    = sup
+    def __init__(self, escenario, x, y):
+        self.esc = escenario
+        self.x   = x
+        self.y   = y
 
+        # Determinar jugador que tiene inicialmente la superioridad aerea
+        if x < MAPA_DIM_J:
+            self.jugador = 1
+        elif x >= MAPA_DIM_X - MAPA_DIM_J:
+            self.jugador = 2
+        else:
+            self.jugador = None
+
+        # Determinar coeficientes de superioridad de la casilla y actuales
+        self.supCas = SUP_NORMAL
+        if self.jugador == 1:
+            self.sup = self.supCas
+        elif self.jugador == 2:
+            self.sup = -self.supCas
+        else:
+            self.sup = 0
+
+        # Calcular posicion en el mapa y coordenadas de cada vertice
         ox = (ANCHURA * ANCHURA_JUEGO - MAPA_DIM_X * self.DIM_X) / (2 * self.DIM_X)
         oy = (ALTURA * ALTURA_JUEGO - MAPA_DIM_Y * self.DIM_Y) / (self.DIM_Y)
-        self.centro    = pygame.math.Vector2(self.DIM_X * (x + ox + (y % 2) / 2), self.DIM_Y * (y + oy))
-        print(self.centro)
-        self.verts     = [self.centro + v for v in escenario.hex_vertices]
-        
-    
+        self.centro = pygame.math.Vector2(self.DIM_X * (x + ox + (y % 2) / 2), self.DIM_Y * (y + oy))
+        self.verts = [self.centro + v for v in escenario.hex_vertices]
+
     def dibujar(self, surface):
         # Determinar color
         if self.sup <= -MULTIPLICADOR_SUPREMACIA * self.supCas:
@@ -518,7 +542,7 @@ class Casilla:
 
         # Determinar dimensiones (poner borde de anchura MAPA_BORDE_CASILLA)
         pygame.draw.polygon(surface, color, self.verts)
-        
+
 class Escenario:
 
     def __init__(self, surface):
@@ -529,8 +553,13 @@ class Escenario:
         self.hex_vertices = [hex_vert.rotate(60 * i) for i in range(6)]
 
         # Array de casillas
-        self.casillas = [[Casilla(self, x, y, 25, 20) for y in range(MAPA_DIM_Y)] for x in range(MAPA_DIM_X)]
-    
+        self.casillas = [[Casilla(self, x, y) for y in range(MAPA_DIM_Y)] for x in range(MAPA_DIM_X)]
+        supremacia = int(MAPA_DIM_J * MAPA_DIM_Y * SUP_INICIAL)
+        for jugador in range(1, 3):
+            casillas = [c for col in self.casillas for c in col if c.jugador == jugador]
+            for casilla in random.sample(casillas, supremacia):
+                casilla.sup *= 2
+
     def dibujar(self):
         for columna in self.casillas:
             for casilla in columna:

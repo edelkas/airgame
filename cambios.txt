@@ -1,6 +1,10 @@
 Clases:
-  - Añadida la clase casilla, que contiene toda la información necesaria de una casilla, y
-    se encarga de dibujarla.
+  - Añadida la clase Casilla, que contiene toda la información necesaria de una casilla, y
+    se encarga de dibujarla. El tamaño y el color se calculan automáticamente en función
+    del tamaño del tablero, de los coeficientes de superioridad, etc.
+  - Añadida la clase Escenario, que mantiene el array de Casillas y se encarga de actualizarlo
+    cada fotograma.
+  
 
 Estéticos:
   - Alineamiento de varias partes del código.
