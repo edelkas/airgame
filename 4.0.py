@@ -28,6 +28,7 @@
 #       actualizar estado, y dibujar en pantalla.
 
 import enum    # Clases que funcionan como un enum de C
+import math    # Operaciones y funciones matemáticas
 import os      # Manipulaciones del sistema
 import pygame  # Motor del juego
 import random  # Para generacion de números aleatorios
@@ -60,7 +61,7 @@ COLOR_TEXTO        = (0, 0, 0)        # Color RGB por defecto del texto
 TEXTO_FUENTE       = "Century Gothic" # Fuente de los textos
 TEXTO_FUENTE_MONO  = "Mono"           # Fuente para textos monoespaciados
 TEXTO_TAMANO       = 24               # Tamaño de fuente por defecto
-TEXTO_TAMANOS = [14, 16, 20, 24, 36, 72, 180]  # Tamaños de fuente que se usaran
+TEXTO_TAMANOS = [14, 16, 20, 24, 36, 72, 180] # Tamaños de fuente que se usaran
 
 # Propiedades generales de todos los paneles, por defecto
 PANEL_BORDE_COLOR  = "#006600" # Color del borde de los paneles
@@ -124,106 +125,7 @@ SUP_CAPITAL     = 100 # Coeficiente de sup aerea en una casilla capital (inicial
 SUP_CAPITAL_INC = 5   # Coeficiente de sup aerea en una casilla capital (incremento por nivel)
 SUP_INICIAL     = 0.1 # Proporción de casillas iniciales con supremacia (aleatorias)
 
-# Reglas
 MULTIPLICADOR_SUPREMACIA = 2 # Ratio entre superioridad y supremacia aerea
-
-indice_reglas = 0
-REGLAS_LISTA = [
-    "\n\nAIRGAME es un juego de estrategia basado en medios militares aéreos. El objetivo del juego es obtener mayor superioridad aérea que el oponente. Dicha superioridad se conseguirá mediante el empleo de diversas aeronaves y medios a lo largo del tablero establecido.\
-    \n\n¿Cómo se consigue la superioridad aérea?\
-    \nDurante el desarrollo del juego, la superioridad aérea (Sup.A) se conseguirá al desplegar aeronaves a lo largo del tablero. Cada medio aéreo posee un coeficiente de Sup.A que se hará efectivo cuando permanezca en una casilla determinada.\
-    \nEjemplo: Si una aeronave del jugador 1(J1) con coeficiente de Sup.A = 5, permanece durante dos turnos en una casilla, a esta se le sumarán 10 puntos de Sup.A de J1. (5 Sup.A x 2 turnos = 10)\
-    \n\nAl inicio del juego, cada casilla tendrá asociada un coeficiente de Sup.A de casilla y otro actual:\
-        \n\t-Coeficiente de superioridad de casilla: Indica que Sup.A hay que ejercer en dicha casilla para obtener la Sup.A.\
-        \n\t-Coeficiente de superioridad actual: Indica la Sup.A que actualmente está ejerciendo un jugador.\
-    \nEjemplo: Una casilla está definida por [10 / 6 (J2)] (10 es el coeficiente de Sup.A de casilla y 6 el actualmente ejercido por el J2). Si como en el ejemplo anterior, una aeronave de J1 permanece 2 turnos en dicha casilla la casilla estará definida por [10 / 4 (J1)]. Si la misma aeronave es capaz de estar cuatro turnos en dicha casilla, J1 obtendrá la Sup.A en dicha casilla ya que el nivel de Sup.A actual de J1 es superior al de la casilla [10 / 14 (J1)].\
-    \n\nExistirán 2 tipos de superioridad aérea, tal y como describe la NATO en el AJP 3.3.:\
-        \n\t-Superioridad aérea (Sup.A): Grado de dominación que permite dirigir operaciones en un momento y lugar dado sin que la interferencia enemiga sea prohibitiva para el desarrollo de las mismas. Se conseguirá cuando el coeficiente de Sup.A de un jugador sea igual o mayor al de la casilla.\
-        \n\t-Supremacía aérea (Supre.A): Grado donde la fuerza aérea enemiga es incapaz de interferir efectivamente a las operaciones propias. Se conseguirá cuando el coeficiente de Sup.A de un jugador sea igual al doble o mayor al de la casilla. Obtener la Supre.A de una casilla permite al jugador poder crear una ciudad o una base en dicha casilla.\
-    \n\nEn el juego también tendrá presencia el estado de igualdad aérea, en el caso de que ninguno de los jugadores posea superioridad aérea.\
-    \n\nEn la primera pantalla aparecerá el tablero de juego, la tienda de productos y el panel de información.\
-        \n\t-Tablero de juego: Esta formado por casillas hexagonales. Existen diferentes tipos de casillas en función de su desempeño en el juego, diferenciándose en su color y en los coeficientes asociados a sus características:\
-            \n\t\t[AZUL] Territorio 1: Casillas en propiedad del jugador 1.\
-			    \n\t\t\t-Coeficiente de Sup.A de casilla: 20\
-            \n\t\t[NARANJA] Territorio 2: Casillas en propiedad del jugador 2.\
-	            \n\t\t\t-Coeficiente de Sup.A de casilla: 20\
-            \n\t\t[NEGRA (AZUL/NARANJA)] Ciudad: Casilla que da al jugador recursos cuando es de su propiedad.\
-	            \n\t\t\t-Coeficiente de Sup.A de casilla: 40\
-                \n\t\t\t-Coeficiente de desarrollo: Nivel de infraestructura alcanzado. Cada ciudad otorgará al jugador (5M x nivel) de la ciudad en cada turno.\
-            \n\t\t[VERDE (AZUL/NARANJA)] Base aérea: Casilla desde la que se despliegan los medios. Cada base podrá desplegar tantos medios como alto sea su nivel.\
-	            \n\t\t\t-Coeficiente de Sup.A de casilla: 60\
-                \n\t\t\t-Coeficiente de movilidad aérea: Nivel de infraestructura alcanzado. Desde cada base se podrán desplegar tantas aeronaves como nivel tenga la base.\
-            \n\t\t[DORADO(AZUL/NARANJA)] Capital: Ciudad más importante de cada jugador. Si el adversario consigue obtener supremacía aérea en dicha casilla, gana la partida.\
-	            \n\t\t\t-Coeficiente de Sup.A de casilla: 100\
-	            \n\t\t\t-Coeficiente de desarrollo: Nivel de infraestructura alcanzado.\
-    \n\n-Tienda de productos: Aparecen los 9 productos disponibles en el juego con una serie de características asociadas:\
-		    \n\t-Medios aéreos:\
-                \n\t\t[AVO. CAZA]: Único medio aéreo que puede atacar otros medios aéreos. El otro medio anti aéreo que puede hacerlo es la batería antiaérea.\
-                \n\t\t[AVO. ATAQUE]: Medio aéreo capaz de atacar medios anti aéreos.\
-                \n\t\t[AVO. TRANSPORTE]: Medio aéreo con más alcance.\
-                \n\t\t[HELICÓPTERO]: Único medio aéreo capaz de aterrizar en una casilla que no sea una base. Además es capaz de atacar medios anti aéreos.\
-                \n\t\t[DRON]: Único medio aéreo con capacidad de vigilancia y con mayor autonomía, además es capaz de atacar medios anti aéreos.\
-		\n\t-Medios anti aéreos:\
-            \n\t\t[RADAR]: Medio antiaéreo con el mayor alcance de vigilancia.\
-            \n\t\t[BATERÍA ANTIAÉREA]: Único medio antiaéreo con capacidad de atacar medios aéreos además de tener capacidad de vigilancia.\
-		\n\t-Medios estratégicos:\
-            \n\t\t[INTELIGENCIA]: Medio estratégico que permite obtener diversa información sobre el adversario.\
-            \n\t\t[INFRAESTRUCTURA]: Medio estratégico que permite aumentar el nivel de las ciudades y bases propias.\
-    \n\n-Panel de información: En el aparecerá la información correspondiente al elemento que en ese momento este indicando el ratón. Además de una breve descripción de cada producto aparecerá la siguiente información dependiendo de si se tratan de medios aéreos, anti aéreos o estratégicos:\
-		    \n\t-Medios aéreos y anti aéreos:\
-			\n\t\t[PRECIO]: coste del medio (€)\
-            \n\t\t[VELOCIDAD]: velocidad a la que va a poder avanzar por las casillas un producto / (km/h) - (casillas/turno).\
-			\n\t\t[AUTONOMÍA]: tiempo que va a poder estar fuera de la base un producto / (horas) - (turnos).\
-			\n\t\t[ALCANCE]: distancia (horizontal) a la que va a poder llegar un producto / (km) - (casillas).\
-			\n\t\t[HUELLA]: probabilidad de ser captado por una vigilancia 100% / (%).\
-			\n\t\t[AIRE]: distancia a la que puede derribar un medio aéreo / (casillas).\
-			\n\t\t[SUP]: distancia a la que puede derribar un medio antiaéreo / (casillas).\
-			\n\t\t[VIGILANCIA]: probabilidad de captar un producto con huella radar 100% / (%).\
-			\n\t\t[RADIOVIG.]: distancia a la que puede vigilar otro producto / (km) - (casillas).\
-			\n\t\t[SUPAEREA]: peso de cada producto a la hora de aportar superioridad aérea / (número).\
-		    \n\t-Medios estratégicos:\
-			\n\t\t[INTELIGENCIA]:\
-			    \n\t\t\t(NIVEL 1): Da la posición de una de las ciudades del oponente.\
-			    \n\t\t\t(NIVEL 2): Da la posición de todas las ciudades del oponente.\
-			    \n\t\t\t(NIVEL 3): Da la posición de la capital del oponente.\
-			    \n\t\t\t(NIVEL 4): Da el nivel de las ciudades y bases del oponente.\
-			    \n\t\t\t(NIVEL 5):  Da información sobre el número de medios de los que dispone el oponente.\
-			\n\t\t[INFRAESTRUCTURA]: este medio estratégico podrá ser ejercido en las siguientes casillas:\
-			    \n\t\t\t(CASILLA CON SUPREMACÍA AÉREA): Se creará una ciudad o una base de nivel 1.\
-			    \n\t\t\t(CIUDAD): Cada nivel de mejora proporcionará más recursos al jugador / 10M x Nivel de ciudad.\
-			    \n\t\t\t(BASE): El nivel de la base determinará el número de medios que se pueden mover de dicha base / 1 medio x Nivel de la base.\
-    \n\nA continuación el jugador deberá elegir en que casillas colocar las ciudades, las bases aéreas y los medios comprados:\
-        \n\t[CIUDADES Y BASES AÉREAS]: Deberán ser colocados en casillas con supremacía aérea del propio jugador.\
-            \n\t\t-Al inicio de la partida el jugador contará con 3 ciudades y 3 bases aéreas que podrá colocar en las casillas en las que posee supremacía aérea.\
-        \n\t[MEDIOS AÉREOS]: Deberán ser colocados en bases aéreas.\
-        \n\t[MEDIOS ANTIAÉREOS]: Deberán ser colocados en casillas con superioridad aérea del propio jugador.\
-    \nLa dinámica principal del juego se basa en turnar una serie de acciones entre los jugadores. Estas acciones serán:\
-        \n\t-Recibir reporte del movimiento del adversario:\
-            \n\t\t[Ataque del enemigo ]: Derribo, destrucción o fracasos de ataques sobre medios propios.\
-            \n\t\t[Conquista de casillas]: En el caso de que el enemigo haya conseguido variar el estado de superioridad aérea de una casilla esta cambiara de color dependiendo de su estado actual.\
-            \n\t\t[Captación de medios del enemigo]: Captación de medios enemigos por radares, baterías y drones propios.\
-        \n\t-Recibir ingresos: Los ingresos que se recibirán serán los siguiente:\
-	        \n\t\t[500M]: Al inicio de la partida.\
-            \n\t\t[10M x ciudad x nivel de la ciudad]: Al principio de cada turno.\
-        \n\t-Recibir inteligencia: La inteligencia recibida dependerá de su nivel.\
-        \n\t-Invertir ingresos: El crédito disponible podrá ser gastado en los productos disponibles en la tienda.\
-        \n\t-Movilizar aeronaves: A la hora de movilizar aeronaves hay que tener una serie de aspectos en cuenta:\
-            \n\t\t[Capacidad de despliegue]: Cada base aérea podrá tener desplegados en un mismo turno tantos medios aéreos como nivel tenga.\
-            \n\t\t[Despegue y aterrizaje en la misma base aérea]: Todas las aeronaves deberán despegar y aterrizar en la misma base aérea. Excepto el helicóptero y el avión de transporte.\
-            \n\t\t[Caso especial, helicóptero]: Puede aterrizar y despegar en cualquier casilla. Solo ejercerá superioridad aérea cuando este en vuelo. Hasta que este no retorne a la base aérea desde la que despegó contará como medio aéreo desplegado para dicha base.\
-            \n\t\t[Caso especial, avión de transporte]: Puede aterrizar y despegar en cualquier base aérea amiga o ciudad, ya se amiga o enemiga. Solo ejercerá superioridad aérea cuando este en vuelo. Hasta que este no retorne a la base aérea desde la que despegó contará como medio aéreo desplegado para dicha base.\
-            \n\t\t[Alcance]: Cada aeronave tiene un alcance de casillas que es inversamente proporcional al tiempo de permanencia (turnos) que queremos que este en la casilla seleccionada. Es decir, cuanto más lejos queremos que llegue, menos tiempo podrá permanecer en dicha casilla.\
-            \n\t\t[Permanencia]: Cada aeronave podrá permanecer un número determinado de turnos en la casilla seleccionada dependiendo del alcance al que se haya querido movilizar a la aeronave.\
-            \n\t\t[Conquista por parte del rival de una base aérea]: Si el oponente es capaz de conseguir la superioridad aérea de una base, tanto los medios desplegados como los medios que estén en la propia base sin desplegar, serán derribados y por lo tanto eliminados del juego.\
-        \n\t-Ataque: Las aeronaves con capacidad de ataque, ya sea aire-aire o aire-suelo que estén en el aire podrán atacar a una casilla en cada turno que estén en el aire. Dicho ataque será visualizado por el oponente, es decir el adversario podrá ver que casilla ha sido atacada y si ha sido un ataque aire-aire o aire-suelo. Si el ataque ha sido certero los medios aéreos (ataque aire-aire) o antiaéreos (aire-suelo) serán destruidos.\
-    \nEl juego finalizará cuando se cumpla uno de los siguientes requisitos:\
-        \n\t-Jx obtenga Supre.A en la capital del adversario. Gana Jx.\
-        \n\t-Jx obtenga Sup.A en todas las ciudades y la capital del adversario. Gana Jx.\
-        \n\t-(Jx) obtenga Sup.A en todas las bases del adversario. Gana Jx.\
-        \n\t-Se acabe el número de rondas establecido previamente por los jugadores. Gana el jugador que sume más puntos de coeficiente de Sup.A."
-    ]
-
-REGLAS = REGLAS_LISTA[indice_reglas]
 
 # Recuadros de ayuda e informacion
 AYUDA_COLOR = (255, 255, 192) # Color del fondo
@@ -266,7 +168,7 @@ iconos = {
     'Inteligencia':    cargar_imagen('icono_inteligencia.png'),
     'Infraestructura': cargar_imagen('icono_infraestructura.png'),
 }
-sonidos = {
+g_sonidos = {
     'dinero': pygame.mixer.Sound(SONIDO_DINERO),
     'error':  pygame.mixer.Sound(SONIDO_ERROR),
 }
@@ -477,9 +379,9 @@ class Casilla:
         self.centro = pygame.math.Vector2(Escenario.ORIGEN_X + self.DIM_X * (x + (y % 2) / 2), Escenario.ORIGEN_Y + self.DIM_Y * y)
         self.verts = [self.centro + v for v in esc.hex_vertices]
 
-    def raton(self, pos):
+    def raton(self, pos_vec):
         """Detecta si el ratón está sobre el botón"""
-        return pos.distance_squared_to(g_escenario.origen + self.centro) <= self.RADIO ** 2
+        return pos_vec.distance_squared_to(g_escenario.origen + self.centro) <= self.RADIO ** 2
 
     def colorear(self):
         """Determinar color"""
@@ -531,15 +433,15 @@ class Escenario:
         self.casilla_sobre = None # Casilla actualmente seleccionada con el raton
         self.casilla_pulsa = None # Casilla actualmente pulsada por el raton
 
-    def raton(self, pos, click):
+    def raton(self):
         """Seleccionar casillas en funcion del raton"""
-        pos_vec = pygame.Vector2(pos)
+        pos_vec = pygame.Vector2(g_raton)
         self.casilla_sobre = None
         for columna in self.casillas:
             for casilla in columna:
                 if casilla.raton(pos_vec):
                     self.casilla_sobre = casilla
-                    if click:
+                    if g_click:
                         self.casilla_pulsa = casilla
 
     def dibujar(self):
@@ -572,6 +474,187 @@ class Informacion:
             x, y, w, h = self.panel.rect
             texto_multilinea(self.texto, (x + 10, y + 30), 14, mono = True, max_ancho = w)
 
+class Reglamento:
+    """Representa el conjunto de reglas, para el pantallazo inicial"""
+
+    REGLAS = """
+    AIRGAME es un juego de estrategia basado en medios militares aéreos. El objetivo del juego es obtener mayor superioridad aérea que el oponente. Dicha superioridad se conseguirá mediante el empleo de diversas aeronaves y medios a lo largo del tablero establecido.
+    ¿Cómo se consigue la superioridad aérea?
+    Durante el desarrollo del juego, la superioridad aérea (Sup.A) se conseguirá al desplegar aeronaves a lo largo del tablero. Cada medio aéreo posee un coeficiente de Sup.A que se hará efectivo cuando permanezca en una casilla determinada.
+    Ejemplo: Si una aeronave del jugador 1(J1) con coeficiente de Sup.A = 5, permanece durante dos turnos en una casilla, a esta se le sumarán 10 puntos de Sup.A de J1. (5 Sup.A x 2 turnos = 10)
+    Al inicio del juego, cada casilla tendrá asociada un coeficiente de Sup.A de casilla y otro actual:
+        -Coeficiente de superioridad de casilla: Indica que Sup.A hay que ejercer en dicha casilla para obtener la Sup.A.
+        -Coeficiente de superioridad actual: Indica la Sup.A que actualmente está ejerciendo un jugador.
+    Ejemplo: Una casilla está definida por [10 / 6 (J2)] (10 es el coeficiente de Sup.A de casilla y 6 el actualmente ejercido por el J2). Si como en el ejemplo anterior, una aeronave de J1 permanece 2 turnos en dicha casilla la casilla estará definida por [10 / 4 (J1)]. Si la misma aeronave es capaz de estar cuatro turnos en dicha casilla, J1 obtendrá la Sup.A en dicha casilla ya que el nivel de Sup.A actual de J1 es superior al de la casilla [10 / 14 (J1)].
+    Existirán 2 tipos de superioridad aérea, tal y como describe la NATO en el AJP 3.3.:
+        -Superioridad aérea (Sup.A): Grado de dominación que permite dirigir operaciones en un momento y lugar dado sin que la interferencia enemiga sea prohibitiva para el desarrollo de las mismas. Se conseguirá cuando el coeficiente de Sup.A de un jugador sea igual o mayor al de la casilla.
+        -Supremacía aérea (Supre.A): Grado donde la fuerza aérea enemiga es incapaz de interferir efectivamente a las operaciones propias. Se conseguirá cuando el coeficiente de Sup.A de un jugador sea igual al doble o mayor al de la casilla. Obtener la Supre.A de una casilla permite al jugador poder crear una ciudad o una base en dicha casilla.
+    En el juego también tendrá presencia el estado de igualdad aérea, en el caso de que ninguno de los jugadores posea superioridad aérea.
+    En la primera pantalla aparecerá el tablero de juego, la tienda de productos y el panel de información.
+        -Tablero de juego: Esta formado por casillas hexagonales. Existen diferentes tipos de casillas en función de su desempeño en el juego, diferenciándose en su color y en los coeficientes asociados a sus características:
+            [AZUL] Territorio 1: Casillas en propiedad del jugador 1.
+                -Coeficiente de Sup.A de casilla: 20
+            [NARANJA] Territorio 2: Casillas en propiedad del jugador 2.
+                -Coeficiente de Sup.A de casilla: 20
+            [NEGRA (AZUL/NARANJA)] Ciudad: Casilla que da al jugador recursos cuando es de su propiedad.
+                -Coeficiente de Sup.A de casilla: 40
+                -Coeficiente de desarrollo: Nivel de infraestructura alcanzado. Cada ciudad otorgará al jugador (5M x nivel) de la ciudad en cada turno.
+            [VERDE (AZUL/NARANJA)] Base aérea: Casilla desde la que se despliegan los medios. Cada base podrá desplegar tantos medios como alto sea su nivel.
+                -Coeficiente de Sup.A de casilla: 60
+                -Coeficiente de movilidad aérea: Nivel de infraestructura alcanzado. Desde cada base se podrán desplegar tantas aeronaves como nivel tenga la base.
+            [DORADO(AZUL/NARANJA)] Capital: Ciudad más importante de cada jugador. Si el adversario consigue obtener supremacía aérea en dicha casilla, gana la partida.
+                -Coeficiente de Sup.A de casilla: 100
+                -Coeficiente de desarrollo: Nivel de infraestructura alcanzado.
+    -Tienda de productos: Aparecen los 9 productos disponibles en el juego con una serie de características asociadas:
+            -Medios aéreos:
+                [AVO. CAZA]: Único medio aéreo que puede atacar otros medios aéreos. El otro medio anti aéreo que puede hacerlo es la batería antiaérea.
+                [AVO. ATAQUE]: Medio aéreo capaz de atacar medios anti aéreos.
+                [AVO. TRANSPORTE]: Medio aéreo con más alcance.
+                [HELICÓPTERO]: Único medio aéreo capaz de aterrizar en una casilla que no sea una base. Además es capaz de atacar medios anti aéreos.
+                [DRON]: Único medio aéreo con capacidad de vigilancia y con mayor autonomía, además es capaz de atacar medios anti aéreos.
+        -Medios anti aéreos:
+            [RADAR]: Medio antiaéreo con el mayor alcance de vigilancia.
+            [BATERÍA ANTIAÉREA]: Único medio antiaéreo con capacidad de atacar medios aéreos además de tener capacidad de vigilancia.
+        -Medios estratégicos:
+            [INTELIGENCIA]: Medio estratégico que permite obtener diversa información sobre el adversario.
+            [INFRAESTRUCTURA]: Medio estratégico que permite aumentar el nivel de las ciudades y bases propias.
+    -Panel de información: En el aparecerá la información correspondiente al elemento que en ese momento este indicando el ratón. Además de una breve descripción de cada producto aparecerá la siguiente información dependiendo de si se tratan de medios aéreos, anti aéreos o estratégicos:
+            -Medios aéreos y anti aéreos:
+            [PRECIO]: coste del medio (€)
+            [VELOCIDAD]: velocidad a la que va a poder avanzar por las casillas un producto / (km/h) - (casillas/turno).
+            [AUTONOMÍA]: tiempo que va a poder estar fuera de la base un producto / (horas) - (turnos).
+            [ALCANCE]: distancia (horizontal) a la que va a poder llegar un producto / (km) - (casillas).
+            [HUELLA]: probabilidad de ser captado por una vigilancia 100% / (%).
+            [AIRE]: distancia a la que puede derribar un medio aéreo / (casillas).
+            [SUP]: distancia a la que puede derribar un medio antiaéreo / (casillas).
+            [VIGILANCIA]: probabilidad de captar un producto con huella radar 100% / (%).
+            [RADIOVIG.]: distancia a la que puede vigilar otro producto / (km) - (casillas).
+            [SUPAEREA]: peso de cada producto a la hora de aportar superioridad aérea / (número).
+            -Medios estratégicos:
+            [INTELIGENCIA]:
+                (NIVEL 1): Da la posición de una de las ciudades del oponente.
+                (NIVEL 2): Da la posición de todas las ciudades del oponente.
+                (NIVEL 3): Da la posición de la capital del oponente.
+                (NIVEL 4): Da el nivel de las ciudades y bases del oponente.
+                (NIVEL 5): Da información sobre el número de medios de los que dispone el oponente.
+            [INFRAESTRUCTURA]: este medio estratégico podrá ser ejercido en las siguientes casillas:
+                (CASILLA CON SUPREMACÍA AÉREA): Se creará una ciudad o una base de nivel 1.
+                (CIUDAD): Cada nivel de mejora proporcionará más recursos al jugador / 10M x Nivel de ciudad.
+                (BASE): El nivel de la base determinará el número de medios que se pueden mover de dicha base / 1 medio x Nivel de la base.
+    A continuación el jugador deberá elegir en que casillas colocar las ciudades, las bases aéreas y los medios comprados:
+        [CIUDADES Y BASES AÉREAS]: Deberán ser colocados en casillas con supremacía aérea del propio jugador.
+            -Al inicio de la partida el jugador contará con 3 ciudades y 3 bases aéreas que podrá colocar en las casillas en las que posee supremacía aérea.
+        [MEDIOS AÉREOS]: Deberán ser colocados en bases aéreas.
+        [MEDIOS ANTIAÉREOS]: Deberán ser colocados en casillas con superioridad aérea del propio jugador.
+    La dinámica principal del juego se basa en turnar una serie de acciones entre los jugadores. Estas acciones serán:
+        -Recibir reporte del movimiento del adversario:
+            [Ataque del enemigo ]: Derribo, destrucción o fracasos de ataques sobre medios propios.
+            [Conquista de casillas]: En el caso de que el enemigo haya conseguido variar el estado de superioridad aérea de una casilla esta cambiara de color dependiendo de su estado actual.
+            [Captación de medios del enemigo]: Captación de medios enemigos por radares, baterías y drones propios.
+        -Recibir ingresos: Los ingresos que se recibirán serán los siguiente:
+            [500M]: Al inicio de la partida.
+            [10M x ciudad x nivel de la ciudad]: Al principio de cada turno.
+        -Recibir inteligencia: La inteligencia recibida dependerá de su nivel.
+        -Invertir ingresos: El crédito disponible podrá ser gastado en los productos disponibles en la tienda.
+        -Movilizar aeronaves: A la hora de movilizar aeronaves hay que tener una serie de aspectos en cuenta:
+            [Capacidad de despliegue]: Cada base aérea podrá tener desplegados en un mismo turno tantos medios aéreos como nivel tenga.
+            [Despegue y aterrizaje en la misma base aérea]: Todas las aeronaves deberán despegar y aterrizar en la misma base aérea. Excepto el helicóptero y el avión de transporte.
+            [Caso especial, helicóptero]: Puede aterrizar y despegar en cualquier casilla. Solo ejercerá superioridad aérea cuando este en vuelo. Hasta que este no retorne a la base aérea desde la que despegó contará como medio aéreo desplegado para dicha base.
+            [Caso especial, avión de transporte]: Puede aterrizar y despegar en cualquier base aérea amiga o ciudad, ya se amiga o enemiga. Solo ejercerá superioridad aérea cuando este en vuelo. Hasta que este no retorne a la base aérea desde la que despegó contará como medio aéreo desplegado para dicha base.
+            [Alcance]: Cada aeronave tiene un alcance de casillas que es inversamente proporcional al tiempo de permanencia (turnos) que queremos que este en la casilla seleccionada. Es decir, cuanto más lejos queremos que llegue, menos tiempo podrá permanecer en dicha casilla.
+            [Permanencia]: Cada aeronave podrá permanecer un número determinado de turnos en la casilla seleccionada dependiendo del alcance al que se haya querido movilizar a la aeronave.
+            [Conquista por parte del rival de una base aérea]: Si el oponente es capaz de conseguir la superioridad aérea de una base, tanto los medios desplegados como los medios que estén en la propia base sin desplegar, serán derribados y por lo tanto eliminados del juego.
+        -Ataque: Las aeronaves con capacidad de ataque, ya sea aire-aire o aire-suelo que estén en el aire podrán atacar a una casilla en cada turno que estén en el aire. Dicho ataque será visualizado por el oponente, es decir el adversario podrá ver que casilla ha sido atacada y si ha sido un ataque aire-aire o aire-suelo. Si el ataque ha sido certero los medios aéreos (ataque aire-aire) o antiaéreos (aire-suelo) serán destruidos.
+    El juego finalizará cuando se cumpla uno de los siguientes requisitos:
+        -Jx obtenga Supre.A en la capital del adversario. Gana Jx.
+        -Jx obtenga Sup.A en todas las ciudades y la capital del adversario. Gana Jx.
+        -(Jx) obtenga Sup.A en todas las bases del adversario. Gana Jx.
+        -Se acabe el número de rondas establecido previamente por los jugadores. Gana el jugador que sume más puntos de coeficiente de Sup.A.
+    """
+    LINEAS_POR_PAGINA = 20 # Numero de lineas por pagina de reglas
+    TAMANO_FUENTE     = 16 # Tamaño de fuente del resto de texto
+    TAMANO_TITULO     = 72 # Tamaño de fuente del titulo
+    MARGEN_EXTERNO    = 20 # Margen entre el panel y la pantalla
+    MARGEN_INTERNO    = 30 # Margen entre el panel y el texto
+
+    def __init__(self):
+        # Crear superficie auxiliar con todo el contenido, para evitar re-renderizar cada fotograma
+        dim = (ANCHURA - 2 * self.MARGEN_EXTERNO, ALTURA - 2 * self.MARGEN_EXTERNO)
+        self.surface = pygame.Surface(dim, pygame.SRCALPHA)
+        self.panel = Panel((0,0), dim, radio=20, color=PANTALLAZO_REGLAS_COLOR_FONDO, surface=self.surface)
+        x = (g_pantalla.get_width() - self.surface.get_width()) / 2
+        y = (g_pantalla.get_height() - self.surface.get_height()) / 2
+        self.origen = (x, y)
+
+        # Calcular numero de paginas totales
+        fuente = fuentes[self.TAMANO_FUENTE]
+        lineas = dividir_texto(self.REGLAS, fuente, self.panel.rect.w - 2 * self.MARGEN_INTERNO)
+        self.paginas = math.ceil(len(lineas) / self.LINEAS_POR_PAGINA)
+        self.pagina = 0
+        
+        # Botones de control
+        x, y, w, h = self.panel.rect
+        x += self.MARGEN_INTERNO
+        y += self.TAMANO_TITULO + 10 + self.LINEAS_POR_PAGINA * fuente.get_linesize() + 40
+        self.botones = [
+            Boton((x, y), origen=self.origen, texto='Anterior', tamaño=36, accion=self.pagina_anterior, surface=self.surface)
+        ]
+        x += self.botones[-1].dim[0] + 10
+        self.botones.append(Boton((x, y), origen=self.origen, texto='Siguiente', tamaño=36, accion=self.pagina_siguiente, surface=self.surface))
+        x += self.botones[-1].dim[0] + 10
+        self.botones.append(Boton((x, y), origen=self.origen, texto='Salir', tamaño=36, accion=self.resetear, surface=self.surface))
+
+        # Renderizar la superficie, habra que hacerlo cada vez que haya un cambio (ver self.actualizar)
+        self.resetear()
+
+    def renderizar(self):
+        """Renderizar el contenido del reglamento. Hay que llamarlo cada vez que cambie (e.g. al paginar)."""
+        x, y, w, h = self.panel.rect
+        self.surface.fill(COLOR_FONDO)
+        self.panel.dibujar()
+        texto('REGLAS', (x + ANCHURA / 2, y), color=PANTALLAZO_REGLAS_COLOR_TEXTO, tamaño=self.TAMANO_TITULO, alineado='c', surface=self.surface)
+        texto_multilinea(
+            Reglamento.REGLAS, (x + self.MARGEN_INTERNO, y + self.TAMANO_TITULO + 10), color=PANTALLAZO_REGLAS_COLOR_TEXTO, tamaño=self.TAMANO_FUENTE,
+            max_ancho=w-2*self.MARGEN_INTERNO, max_alto=self.LINEAS_POR_PAGINA, surface=self.surface, pagina=self.pagina
+        )
+        for boton in self.botones:
+            boton.dibujar()
+
+    def pagina_anterior(self):
+        """Cambiar a la pagina anterior"""
+        if self.pagina > 0:
+            self.pagina -= 1
+        else:
+            g_sonidos['error'].play()
+        self.renderizar()
+
+    def pagina_siguiente(self):
+        """Cambiar a la pagina siguiente"""
+        if self.pagina < self.paginas - 1:
+            self.pagina += 1
+        else:
+            g_sonidos['error'].play()
+        self.renderizar()
+
+    def resetear(self):
+        """Inicializar paginacion"""
+        global g_mostrar_reglas
+        self.pagina = 0
+        self.renderizar()
+        g_mostrar_reglas = False
+    
+    def actualizar(self):
+        """Actualiza el estado del panel de reglas. Si hay algun cambio, vuelve a renderizar. Ejecutar cada fotograma."""
+        cambio = False
+        for boton in self.botones:
+            cambio = cambio or boton.actualizar()
+        if cambio:
+            self.renderizar()
+
+    def dibujar(self):
+        """Dibujar el reglamento en pantalla. Hay que llamarlo cada fotograma."""
+        g_pantalla.blit(self.surface, self.origen)
+
 # < -------------------------------------------------------------------------- >
 #                             CLASES DE LA INTERFAZ
 # < -------------------------------------------------------------------------- >
@@ -587,7 +670,8 @@ class Panel:
             color_borde = PANEL_BORDE_COLOR,  # Color del borde
             grosor      = PANEL_BORDE_GROSOR, # Grosor del borde
             radio       = PANEL_BORDE_RADIO,  # Radio de curvatura de las esquinas
-            surface     = g_pantalla          # Superficie donde dibujar panel
+            surface     = g_pantalla,         # Superficie donde dibujar panel
+            origen      = (0, 0)              # Posicion de la superficie en la pantalla
         ):
         # Guardar parámetros del panel
         self.pos         = pos
@@ -598,6 +682,7 @@ class Panel:
         self.radio       = radio
         self.nombre      = nombre
         self.surface     = surface
+        self.origen      = origen
 
         # Crear otros elementos útiles
         self.rect = pygame.Rect(pos, dim)
@@ -613,43 +698,53 @@ class Panel:
 
         # Nombre
         if self.nombre:
-            texto(self.nombre.capitalize(), (self.pos[0] + self.dim[0] / 2, self.pos[1]), 24, alineado = 'c', subrayado = True, surface=self.surface)
+            texto(self.nombre.capitalize(), (self.pos[0] + self.dim[0] / 2, self.pos[1]), 24, alineado = 'c', subrayado = True, surface = self.surface)
+
+    def raton(self):
+        """Devuelve si el raton está sobre el panel"""
+        return self.rect.collidepoint((g_raton[0] - self.origen[0], g_raton[1] - self.origen[1]))
 
 class Boton:
     """Clase que representa un boton clickable"""
-    def __init__(self, pos, texto=None, imagen=None, ayuda=None, info=None, accion=None, args=()):
+    def __init__(self, pos, origen=(0,0), texto=None, tamaño=BOTON_TAMANO_LETRA, imagen=None, ayuda=None, info=None, indice=None, accion=None, args=(), surface=g_pantalla):
         if not texto and not imagen:
             return
-        self.pos    = pos         # Posición del botón en pantalla
-        self.ayuda  = ayuda       # Pequeña descripción del botón, para cuando es seleccionado
-        self.info   = info        # Descripción más detallada del botón seleccionado
-        self.accion = accion      # Función a ejecutar si el botón es pulsado
-        self.args   = args        # Argumentos que mandar a la función acción, si son necesarios
-        self.indice = 0           # Pequeño número que aparezca en la esquina del botón
+        self.pos     = pos        # Posición del botón en pantalla
+        self.texto   = None       # Texto del boton
+        self.imagen  = None       # Imagen del boton
+        self.ayuda   = ayuda      # Pequeña descripción del botón, para cuando es seleccionado
+        self.info    = info       # Descripción más detallada del botón seleccionado
+        self.accion  = accion     # Función a ejecutar si el botón es pulsado
+        self.args    = args       # Argumentos que mandar a la función acción, si son necesarios
+        self.surface = surface    # Superficie sobre la que se renderiza en boton
+        self.indice  = indice     # Pequeño número que aparezca en la esquina del botón
 
         # Calculamos el tamaño del boton
         if texto:
+            if not tamaño in TEXTO_TAMANOS:
+                tamaño = BOTON_TAMANO_LETRA
             self.texto = texto
-            fuente = fuentes[BOTON_TAMANO_LETRA]
-            self.imagen = fuente.render(texto, True, (0, 0, 0))
+            self.imagen = fuentes[tamaño].render(texto, True, (0, 0, 0))
         else:
             self.imagen = imagen
         x, y = self.imagen.get_size()
-        self.dim = (x + 2, y + 2) # Dimensiones del botón
+        self.dim = (x + 5, y + 5) # Dimensiones del botón
 
         # Logica
         self.selec = False        # Verdadero si el ratón está encima del botón
         self.pulsado = False      # Verdadero si el botón está siendo pulsado
 
         # Otros elementos
-        self.panel = Panel(self.pos, self.dim, None, BOTON_COLOR_NORMAL)
-
-    def raton(self, pos):
-        """Detecta si el ratón está sobre el botón"""
-        return self.panel.rect.collidepoint(pos)
+        self.panel = Panel(self.pos, self.dim, None, BOTON_COLOR_NORMAL, surface=self.surface, origen=origen)
 
     def actualizar(self):
         """Actualizar estado y propiedades del boton"""
+        # Estado
+        selec_viejo = self.selec
+        pulsado_viejo = self.pulsado
+        self.selec = self.panel.raton()
+        self.pulsado = self.selec and g_click
+
         # Actualizar color
         if self.pulsado:
             self.panel.color = BOTON_COLOR_PULSA
@@ -659,8 +754,8 @@ class Boton:
             self.panel.color = BOTON_COLOR_NORMAL
 
         # Mostrar información en el panel informativo
-        global texto_ayuda
-        if self.selec:
+        if self.selec and self.info:
+            global texto_ayuda
             g_info.escribir(self.info)
             texto_ayuda = self.ayuda
 
@@ -668,15 +763,20 @@ class Boton:
         if self.pulsado:
             self.accion(*self.args)
 
+        # Devolver si ha habido cambio de estado
+        return selec_viejo != self.selec or pulsado_viejo != self.pulsado
+
     def dibujar(self):
         """Renderizar el boton en pantalla"""
-        self.panel.dibujar()
-        g_pantalla.blit(self.imagen, self.pos)
-        fuente = fuentes[AYUDA_TAMANO]
         x, y = self.pos
+        self.panel.dibujar()
+        self.surface.blit(self.imagen, (x + 2, y + 2))
+        if not self.indice:
+            return
+        fuente = fuentes[AYUDA_TAMANO]
         w1, h1 = self.dim
         w2, h2 = fuente.size(str(self.indice))
-        texto(str(self.indice), (x + w1 - 2, y + h1 - h2), AYUDA_TAMANO, (0, 0, 0), 'd')
+        texto(str(self.indice), (x + w1 - 2, y + h1 - h2), AYUDA_TAMANO, (0, 0, 0), 'd', surface=self.surface)
 
 class Fase(enum.IntEnum):
     """Representa cada posible fase del juego"""
@@ -695,7 +795,7 @@ def tiempo():
 
 def ayuda():
     """Muestra un pequeño rectángulo con información de ayuda y las info asociada a cada producto cuando el ratón esta sobre su botón"""
-    x, y = pygame.mouse.get_pos()
+    x, y = g_raton
     pos = (x - 80, y + 20)
     fuente = fuentes[AYUDA_TAMANO]
     dim = fuente.size(texto_ayuda)
@@ -777,18 +877,25 @@ def texto_multilinea(
         subrayado = False,
         mono      = False,
         surface   = g_pantalla,
-        max_ancho = 200
+        pagina    = 1,
+        max_ancho = 200,
+        max_alto  = 20
     ):
-    """Permite dividir el texto, producir saltos de línea y tabulaciones"""
+    """
+    Permite dividir el texto, producir saltos de línea y tabulaciones
+    Devuelve un booleano que indica si faltan paginas por dibujar
+    """
     if not tamaño in TEXTO_TAMANOS:
         tamaño = TEXTO_TAMANO
-    fuente = fuentes[tamaño]
+    fuente = fuentes_mono[tamaño] if mono else fuentes[tamaño]
     x, y = posicion
     lineas = dividir_texto(cadena.replace('\t', '    '), fuente, max_ancho)
-    for linea in lineas:
-        texto(linea, (x, y), tamaño, color, alineado, negrita, cursiva, subrayado, surface)
-        y += fuente.get_height()
-
+    paginas = math.ceil(len(lineas) / max_alto)
+    pagina = min(max(0, pagina), paginas - 1)
+    for linea in lineas[max_alto * pagina : max_alto * (pagina + 1)]:
+        texto(linea, (x, y), tamaño, color, alineado, negrita, cursiva, subrayado, mono, surface)
+        y += fuente.get_linesize()
+    return pagina < paginas - 1
 
 # < -------------------------------------------------------------------------- >
 #                       ACTUALIZACION DEL ESTADO DEL JUEGO
@@ -798,25 +905,12 @@ def comprar(medio):
     """"Ejecuta la acción de comprar un producto"""
     global credito
     if credito < medio.PRECIO:
-        sonidos['error'].play()
+        g_sonidos['error'].play()
         return
-    sonidos['dinero'].play()
+    g_sonidos['dinero'].play()
     inventario[medio] += 1
-    botones[medio].indice += 1
+    g_botones[medio].indice += 1
     credito -= medio.PRECIO
-
-def analizar_raton(click):
-    """Según la posición del ratón, ver si tenemos que realizar alguna acción"""
-    pos = pygame.mouse.get_pos()
-
-    # Cambiar estado de los botones (seleccionado y/o pulsado, si procede)
-    for boton in botones.values():
-        sel = boton.raton(pos)
-        boton.selec = sel
-        boton.pulsado = sel and click
-
-    # Seleccionar celdas en el escenario y demás
-    g_escenario.raton(pos, click)
 
 def actualizar_fondo():
     """Dibujar el fondo (primera capa del display)"""
@@ -826,7 +920,7 @@ def actualizar_paneles():
     """Actualizar el contenido de cada panel"""
     for panel in paneles.values():
         panel.dibujar()
-    for boton in botones.values():
+    for boton in g_botones.values():
         boton.actualizar()
         boton.dibujar()
 
@@ -837,6 +931,7 @@ def actualizar_textos():
     g_info.dibujar()
 
 def actualizar_escenario():
+    g_escenario.raton()
     g_escenario.dibujar()
 
 def siguiente_fotograma():
@@ -852,35 +947,33 @@ def siguiente_fase():
     else:
         g_fase = Fase.PANTALLAZO
 
-def resetear_variables():
-    """Inicializar variables que quieren refrescarse cada fotograma"""
-    global texto_ayuda
+def actualizar_variables():
+    """Actualizacion de variables en cada fotograma"""
+    global texto_ayuda, g_raton
     texto_ayuda = None
     g_info.borrar()
+    g_raton = pygame.mouse.get_pos()
 
 def actualizar_fase_pantallazo():
     """Dibujar pantallazo inicial"""
-    x = (g_pantalla.get_width() - pantallazo.get_width()) / 2
-    y = (g_pantalla.get_height() - pantallazo.get_height()) / 2
-    g_pantalla.blit(pantallazo, (x, y))
+    x = (g_pantalla.get_width() - imagen_pantallazo.get_width()) / 2
+    y = (g_pantalla.get_height() - imagen_pantallazo.get_height()) / 2
+    g_pantalla.blit(imagen_pantallazo, (x, y))
 
 def actualizar_fase_reglas():
     """Dibujar pantallazo reglas"""
-    x = (g_pantalla.get_width() - pantallazo_reglas.get_width()) / 2
-    y = (g_pantalla.get_height() - pantallazo_reglas.get_height()) / 2
-    g_pantalla.blit(pantallazo_reglas, (x, y))
+    g_reglas.actualizar()
+    g_reglas.dibujar()
 
-def actualizar_fase_turnos(click):
+def actualizar_fase_turnos():
     """Actualizar estado en la fase de turnos"""
-    # Reaccionar a las acciones del raton
-    analizar_raton(click)
-
-    # Renderizar fotograma en pantalla
     actualizar_paneles()
     actualizar_textos()
     actualizar_escenario()
     if texto_ayuda:
         ayuda()
+    if g_mostrar_reglas:
+        actualizar_fase_reglas()
 
 # < -------------------------------------------------------------------------- >
 #                           INICIALIZACIÓN DEL JUEGO
@@ -891,7 +984,6 @@ if MUSICA_REPRODUCIR:
     pygame.mixer.music.play(-1)
 
 # Inicializar variables básicas
-nombre  = NOMBRE_DEFECTO
 credito = CREDITO_INICIAL
 productos  = [
     AvionCaza, AvionAtaque, AvionTransporte, Helicoptero, Dron, Radar, Bateria, Inteligencia, Infraestructura]
@@ -905,26 +997,8 @@ paneles = {
     'informacion': Panel((sep, ALTURA * ALTURA_JUEGO + sep / 2), (ANCHURA - 2 * sep, ALTURA * ALTURA_INFORMACION - 1.5 * sep), 'información')
 }
 
-# Configurar pantallazo reglas
-dim = (1280, 720)
-pantallazo_reglas = pygame.Surface(dim, pygame.SRCALPHA)
-pantallazo_reglas.fill((0, 0, 0, 0))
-panel_pantallazo_reglas = Panel((0, 0), dim, radio=20, color=PANTALLAZO_REGLAS_COLOR_FONDO, surface=pantallazo_reglas)
-panel_pantallazo_reglas.dibujar()
-texto('REGLAS', (pantallazo_reglas.get_width() / 2, 0), color=PANTALLAZO_REGLAS_COLOR_TEXTO, tamaño=72, alineado='c', surface=pantallazo_reglas)
-texto_multilinea(REGLAS, (30, 90), color=PANTALLAZO_REGLAS_COLOR_TEXTO,tamaño=16, alineado='i', surface=pantallazo_reglas, max_ancho=1200)
-
-# Configurar pantallazo inicial
-dim = (imagen_pantallazo.get_width() + 20, imagen_pantallazo.get_height() + 20)
-pantallazo = pygame.Surface(dim, pygame.SRCALPHA)
-pantallazo.fill((0, 0, 0, 0))
-panel_pantallazo = Panel((0, 0), dim, radio=20, color=PANTALLAZO_COLOR_FONDO, surface=pantallazo)
-panel_pantallazo.dibujar()
-pantallazo.blit(imagen_pantallazo, (10, 10))
-texto(NOMBRE_JUEGO, (pantallazo.get_width() / 2, pantallazo.get_height() / 3), color=PANTALLAZO_COLOR_TEXTO, tamaño=180, alineado='c', surface=pantallazo)
-
 # Configurar botones
-botones = { producto: None for producto in productos }
+g_botones = { producto: None for producto in productos }
 cols = 2
 i = 0
 x0 = ANCHURA * ANCHURA_JUEGO + 20
@@ -932,19 +1006,25 @@ y0 = 100
 x = x0
 y = y0
 for producto in productos:
-    botones[producto] = Boton((x, y), imagen=producto.ICONO, ayuda=producto.ayuda(), info=producto.info(), accion=comprar, args=(producto,))
-    x = x + botones[producto].dim[0] + 5 if i % cols < cols - 1 else x0
-    y += botones[producto].dim[1] + 5 if i % cols == cols - 1 else 0
+    g_botones[producto] = Boton((x, y), imagen=producto.ICONO, ayuda=producto.ayuda(), info=producto.info(), indice=0, accion=comprar, args=(producto,))
+    x = x + g_botones[producto].dim[0] + 5 if i % cols < cols - 1 else x0
+    y += g_botones[producto].dim[1] + 5 if i % cols == cols - 1 else 0
     i += 1
 
 # Inicializar escenario (casillas y su contenido)
 g_escenario = Escenario(paneles['escenario'])
 
-# Inicializar panel informativo
+# Inicializar clases informativas
 g_info = Informacion(paneles['informacion'])
+g_reglas = Reglamento()
 
-# Inicializar juego
+# Inicializar juego en la primera fase
 g_fase = Fase.PANTALLAZO
+
+# Estado
+g_raton = pygame.mouse.get_pos()
+g_click = False
+g_mostrar_reglas = False
 
 # < -------------------------------------------------------------------------- >
 #                          BUCLE PRINCIPAL DEL JUEGO
@@ -953,30 +1033,31 @@ g_fase = Fase.PANTALLAZO
 while True:
     # Escanear eventos (pulsaciones de teclas, movimientos de ratón, etc)
     cerrar = False
-    click = False
+    g_click = False
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             cerrar = True
         elif event.type == pygame.MOUSEBUTTONDOWN:
-            click = True
+            g_click = True
     if cerrar:
         pygame.quit()
         break
 
-    resetear_variables() # Inicializar estado
-    actualizar_fondo()   # Colorear fondo
+    actualizar_variables() # Inicializar estado
+    actualizar_fondo()     # Colorear fondo
 
     # Ejecutar cada fase del juego
     if g_fase == Fase.PANTALLAZO:       # Pantallazo inicial
         actualizar_fase_pantallazo()
-        if click:
+        if g_click:
+            g_mostrar_reglas = True
             siguiente_fase()
     elif g_fase == Fase.REGLAS:         # Pantallazo de reglas
         actualizar_fase_reglas()
-        if click:
+        if not g_mostrar_reglas:
             siguiente_fase()
     elif g_fase == Fase.TURNOS:         # Fase central del juego
-        actualizar_fase_turnos(click)
+        actualizar_fase_turnos()
     else:
         pass
 

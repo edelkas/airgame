@@ -1,11 +1,19 @@
+Conceptuales:
+  - Ahora todo el programa tiene un sistema de fases por las que se va cambiado, en lugar
+    de basarnos en tiempos como antes: pantallazo, reglas, turnos, etc.
+
 Clases:
   - Añadida la clase Casilla, que contiene toda la información necesaria de una casilla, y
     se encarga de dibujarla. El tamaño y el color se calculan automáticamente en función
     del tamaño del tablero, de los coeficientes de superioridad, etc.
   - Añadida la clase Escenario, que mantiene el array de Casillas y se encarga de actualizarlo
     cada fotograma.
+  - Añadida la clase Informacion, que se encarga de almacenar y mostrar la información en el panel
+    inferior de manera ordenada.
+  - Añadida la clase Reglamento, que almacena y muestra las reglas en un panel nuevo que se puede
+    abrir y cerrar. Tiene paginación incorporada, y sólo se renderiza de nuevo cuando algo
+    ha cambiado, por eficiencia.
   
-
 Estéticos:
   - Alineamiento de varias partes del código.
   - Recortado partes en blanco de los sonidos.
