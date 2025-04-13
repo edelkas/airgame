@@ -483,6 +483,7 @@ class Escenario:
 
     def dibujar(self):
         """Dibujar todas las celdas en pantalla"""
+        self.panel.dibujar()
         for columna in self.casillas:
             for casilla in columna:
                 casilla.dibujar(self.panel.surface)
@@ -518,6 +519,7 @@ class Informacion:
 
     def dibujar(self):
         """Renderizar el texto en pantalla"""
+        self.panel.dibujar()
         if self.texto:
             x, y, w, h = self.panel.rect
             texto_multilinea(self.texto, (x + 10, y + 30), 14, mono = True, max_ancho = w)
@@ -734,8 +736,42 @@ class Jugador:
             return
         reproducir_sonido('dinero')
         self.inventario[medio] += 1
-        g_botones[medio].indice += 1
+        g_tienda.botones[medio].indice = self.inventario[medio]
         self.credito -= medio.PRECIO
+
+class Tienda:
+    """Contiene todos los productos que se pueden adquirir y se encarga de su funcionalidad y renderizado"""
+    BOTON_SEP = 5
+    TAM_FUENTE = 24
+
+    def __init__(self, panel):
+        self.panel = panel
+
+        # Crear los botones
+        linea = g_fuentes[self.TAM_FUENTE].get_linesize()
+        self.botones = {}
+        cols = 2
+        x = ANCHURA * ANCHURA_JUEGO + 20
+        y = 2 * (PANEL_SEPARACION + linea)
+        for i, producto in enumerate(g_productos):
+            self.botones[producto] = Boton((x, y), imagen=producto.ICONO, ayuda=producto.ayuda(), info=producto.info(), indice=0, accion=lambda p: g_jugador.comprar(p), args=(producto,), audio_pul=None)
+            dx, dy = self.botones[producto].dim
+            x += dx + self.BOTON_SEP if i % cols  < cols - 1 else -(dx + self.BOTON_SEP) * (cols - 1)
+            y += dy + self.BOTON_SEP if i % cols == cols - 1 else 0
+
+    def actualizar(self):
+        """Actualizar estado del contenido de la tienda"""
+        for boton in self.botones.values():
+            boton.actualizar()
+
+    def dibujar(self):
+        """Renderizar la tienda en pantalla"""
+        self.panel.dibujar()
+        linea = g_fuentes[self.TAM_FUENTE].get_linesize()
+        texto(f"Crédito: {g_jugador.credito}M", (ANCHURA * ANCHURA_JUEGO + PANEL_SEPARACION, PANEL_SEPARACION), self.TAM_FUENTE)
+        texto('Tienda', (ANCHURA * (ANCHURA_JUEGO + 1) / 2, PANEL_SEPARACION + linea), self.TAM_FUENTE, alineado = 'c', subrayado = True)
+        for boton in self.botones.values():
+            boton.dibujar()
 
 # < -------------------------------------------------------------------------- >
 #                             CLASES DE LA INTERFAZ
@@ -1058,28 +1094,16 @@ def actualizar_fase_turnos():
     if not g_jugador:
         cambiar_jugador()
 
-    # Actualizar estado del contenido (botones, etc) sólo si el escenario es visible
+    # Actualizar estado sólo si el escenario es visible
     if visible:
-        g_info.actualizar()
         g_escenario.actualizar()
-        for boton in g_botones.values():
-            boton.actualizar()
+        g_tienda.actualizar()
+        g_info.actualizar()
 
-    # Dibujar paneles
-    for panel in g_paneles.values():
-        panel.dibujar()
-
-    # 1 - Escenario
+    # Dibujar contenido de los paneles
     g_escenario.dibujar()
-
-    # 2 - Tienda
-    texto(f"Crédito: {g_jugador.credito}M", (ANCHURA * ANCHURA_JUEGO + PANEL_SEPARACION, PANEL_SEPARACION), 24)
-    texto('Tienda', (ANCHURA * (ANCHURA_JUEGO + 1) / 2, 65), 24, alineado = 'c', subrayado = True)
+    g_tienda.dibujar()
     g_info.dibujar()
-
-    # 3 - Informacion
-    for boton in g_botones.values():
-        boton.dibujar()
 
     # Paneles adicionales opcionales
     if g_ayuda:
@@ -1097,31 +1121,24 @@ if MUSICA_REPRODUCIR:
 
 # Configurar paneles
 sep = PANEL_SEPARACION
-g_paneles = {
-    'escenario':   Panel((sep, sep), (ANCHURA * ANCHURA_JUEGO - 1.5 * sep, ALTURA * ALTURA_JUEGO - 1.5 * sep), 'escenario'),
-    'acciones':    Panel((ANCHURA * ANCHURA_JUEGO + sep / 2, sep), (ANCHURA * ANCHURA_ACCIONES - 1.5 * sep, ALTURA * ALTURA_ACCIONES - 1.5 * sep)),
+paneles = {
+    'escenario':   Panel((sep, sep), (ANCHURA * ANCHURA_JUEGO - 1.5 * sep, ALTURA * ALTURA_JUEGO - 1.5 * sep)),
+    'tienda':      Panel((ANCHURA * ANCHURA_JUEGO + sep / 2, sep), (ANCHURA * ANCHURA_ACCIONES - 1.5 * sep, ALTURA * ALTURA_ACCIONES - 1.5 * sep)),
     'informacion': Panel((sep, ALTURA * ALTURA_JUEGO + sep / 2), (ANCHURA - 2 * sep, ALTURA * ALTURA_INFORMACION - 1.5 * sep), 'información')
 }
 
 # Inicializar algunas variables globales
 g_productos = [AvionCaza, AvionAtaque, AvionTransporte, Helicoptero, Dron, Radar, Bateria, Inteligencia, Infraestructura]
-g_escenario = Escenario(g_paneles['escenario'])     # Casillas del mapa y su contenido
 g_reglas    = Reglamento()                          # Paginador de reglas
-g_info      = Informacion(g_paneles['informacion']) # Panel informativo inferior
+g_escenario = Escenario(paneles['escenario'])     # Casillas del mapa y su contenido
+g_tienda    = Tienda(paneles['tienda'])           # Tienda de productos
+g_info      = Informacion(paneles['informacion']) # Panel informativo inferior
 g_fase      = Fase.PANTALLAZO                       # Inicializar juego en la primera fase
 g_jugadores = [Jugador() for _ in range(2)]         # Lista de jugadores
 g_jugador   = None                                  # Jugador actual
 
 # Configurar botones
-g_botones = {}
-cols = 2
-x = ANCHURA * ANCHURA_JUEGO + 20
-y = 100
-for i, producto in enumerate(g_productos):
-    g_botones[producto] = Boton((x, y), imagen=producto.ICONO, ayuda=producto.ayuda(), info=producto.info(), indice=0, accion=lambda p: g_jugador.comprar(p), args=(producto,), audio_pul=None)
-    dx, dy = g_botones[producto].dim
-    x += dx + 5 if i % cols  < cols - 1 else -(dx + 5) * (cols - 1)
-    y += dy + 5 if i % cols == cols - 1 else 0
+
 
 # Estado
 g_raton = pygame.mouse.get_pos()

@@ -13,7 +13,8 @@ Clases:
   - Añadida la clase Reglamento, que almacena y muestra las reglas en un panel nuevo que se puede
     abrir y cerrar. Tiene paginación incorporada, y sólo se renderiza de nuevo cuando algo
     ha cambiado, por eficiencia.
-  - Añadida la clase Jugador, que mantiene su estado (inventario, credito, etc)
+  - Añadida la clase Jugador, que mantiene su estado (inventario, credito, etc).
+  - Añadida la clase Tienda, que mantiene los medios y sus botones.
   
 Estéticos:
   - Alineamiento de varias partes del código.
