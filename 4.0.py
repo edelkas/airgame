@@ -591,7 +591,7 @@ class Reglamento:
         lineas = dividir_texto(self.REGLAS, fuente, self.panel.rect.w - 2 * self.MARGEN_INTERNO)
         self.paginas = math.ceil(len(lineas) / self.LINEAS_POR_PAGINA)
         self.pagina = 0
-        
+
         # Botones de control
         x, y, w, h = self.panel.rect
         x += self.MARGEN_INTERNO
@@ -642,7 +642,7 @@ class Reglamento:
         self.pagina = 0
         self.renderizar()
         g_mostrar_reglas = False
-    
+
     def actualizar(self):
         """Actualiza el estado del panel de reglas. Si hay algun cambio, vuelve a renderizar. Ejecutar cada fotograma."""
         cambio = False
@@ -654,6 +654,26 @@ class Reglamento:
     def dibujar(self):
         """Dibujar el reglamento en pantalla. Hay que llamarlo cada fotograma."""
         g_pantalla.blit(self.surface, self.origen)
+
+class Jugador:
+    """Representa a cada uno de los jugadores"""
+    jugadores = 0
+
+    def __init__(self):
+        self.indice     = self.jugadores
+        self.inventario = { producto: 0 for producto in g_productos }
+        self.credito    = CREDITO_INICIAL
+        self.jugadores += 1
+
+    def comprar(self, medio):
+        """Adquirir un producto y añadirlo al inventario, si hay credito suficiente"""
+        if self.credito < medio.PRECIO:
+            g_sonidos['error'].play()
+            return
+        g_sonidos['dinero'].play()
+        self.inventario[medio] += 1
+        g_botones[medio].indice += 1
+        self.credito -= medio.PRECIO
 
 # < -------------------------------------------------------------------------- >
 #                             CLASES DE LA INTERFAZ
@@ -901,17 +921,6 @@ def texto_multilinea(
 #                       ACTUALIZACION DEL ESTADO DEL JUEGO
 # < -------------------------------------------------------------------------- >
 
-def comprar(medio):
-    """"Ejecuta la acción de comprar un producto"""
-    global credito
-    if credito < medio.PRECIO:
-        g_sonidos['error'].play()
-        return
-    g_sonidos['dinero'].play()
-    inventario[medio] += 1
-    g_botones[medio].indice += 1
-    credito -= medio.PRECIO
-
 def actualizar_fondo():
     """Dibujar el fondo (primera capa del display)"""
     g_pantalla.fill(COLOR_FONDO)
@@ -926,11 +935,20 @@ def actualizar_paneles():
 
 def actualizar_textos():
     """Actualizar textos en pantalla"""
-    texto(f"Crédito: {credito}M", (ANCHURA * ANCHURA_JUEGO + sep, sep), 24)
+    texto(f"Crédito: {g_jugador.credito}M", (ANCHURA * ANCHURA_JUEGO + sep, sep), 24)
     texto('Tienda', (ANCHURA * (ANCHURA_JUEGO + 1) / 2, 65), 24, alineado = 'c', subrayado = True)
     g_info.dibujar()
 
+def cambiar_jugador():
+    """Cambiar de turno"""
+    global g_jugador
+    if not g_jugador:
+        g_jugador = g_jugadores[0]
+    else:
+        g_jugador = g_jugadores[(g_jugador.indice + 1) % 2]
+
 def actualizar_escenario():
+    """Dibujar el mapa y su contenido"""
     g_escenario.raton()
     g_escenario.dibujar()
 
@@ -962,11 +980,15 @@ def actualizar_fase_pantallazo():
 
 def actualizar_fase_reglas():
     """Dibujar pantallazo reglas"""
+    global g_mostrar_reglas
+    g_mostrar_reglas = True
     g_reglas.actualizar()
     g_reglas.dibujar()
 
 def actualizar_fase_turnos():
     """Actualizar estado en la fase de turnos"""
+    if not g_jugador:
+        cambiar_jugador()
     actualizar_paneles()
     actualizar_textos()
     actualizar_escenario()
@@ -983,12 +1005,6 @@ def actualizar_fase_turnos():
 if MUSICA_REPRODUCIR:
     pygame.mixer.music.play(-1)
 
-# Inicializar variables básicas
-credito = CREDITO_INICIAL
-productos  = [
-    AvionCaza, AvionAtaque, AvionTransporte, Helicoptero, Dron, Radar, Bateria, Inteligencia, Infraestructura]
-inventario = { producto: 0 for producto in productos }
-
 # Configurar paneles
 sep = PANEL_SEPARACION
 paneles = {
@@ -997,29 +1013,25 @@ paneles = {
     'informacion': Panel((sep, ALTURA * ALTURA_JUEGO + sep / 2), (ANCHURA - 2 * sep, ALTURA * ALTURA_INFORMACION - 1.5 * sep), 'información')
 }
 
+# Inicializar algunas variables globales
+g_productos = [AvionCaza, AvionAtaque, AvionTransporte, Helicoptero, Dron, Radar, Bateria, Inteligencia, Infraestructura]
+g_escenario = Escenario(paneles['escenario'])     # Casillas del mapa y su contenido
+g_info      = Informacion(paneles['informacion']) # Panel informativo inferior
+g_reglas    = Reglamento()                        # Paginador de reglas
+g_fase      = Fase.PANTALLAZO                     # Inicializar juego en la primera fase
+g_jugadores = [Jugador() for _ in range(2)]       # Lista de jugadores
+g_jugador   = None                                # Jugador actual
+
 # Configurar botones
-g_botones = { producto: None for producto in productos }
+g_botones = {}
 cols = 2
-i = 0
-x0 = ANCHURA * ANCHURA_JUEGO + 20
-y0 = 100
-x = x0
-y = y0
-for producto in productos:
-    g_botones[producto] = Boton((x, y), imagen=producto.ICONO, ayuda=producto.ayuda(), info=producto.info(), indice=0, accion=comprar, args=(producto,))
-    x = x + g_botones[producto].dim[0] + 5 if i % cols < cols - 1 else x0
-    y += g_botones[producto].dim[1] + 5 if i % cols == cols - 1 else 0
-    i += 1
-
-# Inicializar escenario (casillas y su contenido)
-g_escenario = Escenario(paneles['escenario'])
-
-# Inicializar clases informativas
-g_info = Informacion(paneles['informacion'])
-g_reglas = Reglamento()
-
-# Inicializar juego en la primera fase
-g_fase = Fase.PANTALLAZO
+x = ANCHURA * ANCHURA_JUEGO + 20
+y = 100
+for i, producto in enumerate(g_productos):
+    g_botones[producto] = Boton((x, y), imagen=producto.ICONO, ayuda=producto.ayuda(), info=producto.info(), indice=0, accion=lambda p: g_jugador.comprar(p), args=(producto,))
+    dx, dy = g_botones[producto].dim
+    x += dx + 5 if i % cols  < cols - 1 else -(dx + 5) * (cols - 1)
+    y += dy + 5 if i % cols == cols - 1 else 0
 
 # Estado
 g_raton = pygame.mouse.get_pos()
@@ -1050,7 +1062,6 @@ while True:
     if g_fase == Fase.PANTALLAZO:       # Pantallazo inicial
         actualizar_fase_pantallazo()
         if g_click:
-            g_mostrar_reglas = True
             siguiente_fase()
     elif g_fase == Fase.REGLAS:         # Pantallazo de reglas
         actualizar_fase_reglas()
