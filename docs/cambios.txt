@@ -13,10 +13,11 @@ Clases:
   - Añadida la clase Reglamento, que almacena y muestra las reglas en un panel nuevo que se puede
     abrir y cerrar. Tiene paginación incorporada, y sólo se renderiza de nuevo cuando algo
     ha cambiado, por eficiencia.
+  - Añadida la clase Jugador, que mantiene su estado (inventario, credito, etc)
   
 Estéticos:
   - Alineamiento de varias partes del código.
-  - Recortado partes en blanco de los sonidos.
+  - Sonidos: Más, y recortados mejor los viejos.
   - Todas las variables globales prefijadas con "g_" para distinguirlas más fácilmente.
 
 Organización código:
