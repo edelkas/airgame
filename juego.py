@@ -156,16 +156,16 @@ if (PANTALLA_MODIFICARDIMENSION): flags |= pygame.RESIZABLE
 pygame.init()
 pygame.display.set_caption(NOMBRE_JUEGO)
 g_pantalla = pygame.display.set_mode((ANCHURA, ALTURA), flags)
-clock = pygame.time.Clock()
-texto_ayuda = None
+g_reloj = pygame.time.Clock()
+g_ayuda = None
 
 # Cargar recursos
 pygame.mixer.init()
 pygame.mixer.music.load(os.path.join(CARPETA_AUDIO, MUSICA_FONDO))
-imagen_pantallazo = cargar_imagen(IMAGEN_FONDO)
-fuentes = { tam: pygame.font.SysFont(TEXTO_FUENTE, tam) for tam in TEXTO_TAMANOS }
-fuentes_mono = { tam: pygame.font.SysFont(TEXTO_FUENTE_MONO, tam) for tam in TEXTO_TAMANOS }
-iconos = {
+g_pantallazo = cargar_imagen(IMAGEN_FONDO)
+g_fuentes = { tam: pygame.font.SysFont(TEXTO_FUENTE, tam) for tam in TEXTO_TAMANOS }
+g_fuentes_mono = { tam: pygame.font.SysFont(TEXTO_FUENTE_MONO, tam) for tam in TEXTO_TAMANOS }
+g_iconos = {
     'AvionCaza':       cargar_imagen('icono_caza.png'),
     'AvionAtaque':     cargar_imagen('icono_ataque.png'),
     'AvionTransporte': cargar_imagen('icono_transporte.png'),
@@ -237,7 +237,7 @@ class MedioEstrategico(Medio):
 class AvionCaza(MedioAereo):
     """Representa un avión de caza"""
     NOMBRE     = "Avo. Caza"
-    ICONO      = iconos['AvionCaza']
+    ICONO      = g_iconos['AvionCaza']
     DESC       = 'Único medio aéreo que puede atacar otros medios aéreos. El otro medio que puede hacerlo es la batería antiaérea.'
     PRECIO     = 50
     VELOCIDAD  = 2100
@@ -253,7 +253,7 @@ class AvionCaza(MedioAereo):
 class AvionAtaque(MedioAereo):
     """Representa un avión de ataque"""
     NOMBRE     = "Avo. Ataque"
-    ICONO      = iconos['AvionAtaque']
+    ICONO      = g_iconos['AvionAtaque']
     DESC       = 'Medio aéreo capaz de atacar medios anti aéreos.'
     PRECIO     = 65
     VELOCIDAD  = 1350
@@ -269,7 +269,7 @@ class AvionAtaque(MedioAereo):
 class AvionTransporte(MedioAereo):
     """Representa un avión de transporte"""
     NOMBRE     = "Avo. Transporte"
-    ICONO      = iconos['AvionTransporte']
+    ICONO      = g_iconos['AvionTransporte']
     DESC       = 'Medio aéreo con más alcance.'
     PRECIO     = 120
     VELOCIDAD  = 820
@@ -285,7 +285,7 @@ class AvionTransporte(MedioAereo):
 class Helicoptero(MedioAereo):
     """Representa un helicóptero"""
     NOMBRE     = "Helicóptero"
-    ICONO      = iconos['Helicoptero']
+    ICONO      = g_iconos['Helicoptero']
     DESC       = 'Único medio aéreo capaz de aterrizar en una casilla que no sea una base. Además es capaz de atacar medios anti aéreos.'
     PRECIO     = 21
     VELOCIDAD  = 260
@@ -301,7 +301,7 @@ class Helicoptero(MedioAereo):
 class Dron(MedioAereo):
     """Representa un dron"""
     NOMBRE     = "Dron"
-    ICONO      = iconos['Dron']
+    ICONO      = g_iconos['Dron']
     DESC       = 'Único medio aéreo con capacidad de vigilancia y con mayor autonomía, además es capaz de atacar medios anti aéreos.'
     PRECIO     = 25
     VELOCIDAD  = 240
@@ -317,7 +317,7 @@ class Dron(MedioAereo):
 class Radar(MedioAntiaereo):
     """Representa un radar"""
     NOMBRE     = "Radar"
-    ICONO      = iconos['Radar']
+    ICONO      = g_iconos['Radar']
     DESC       = 'Medio antiaéreo con el mayor alcance de vigilancia.'
     PRECIO     = 24
     HUELLA     = 100
@@ -330,7 +330,7 @@ class Radar(MedioAntiaereo):
 class Bateria(MedioAntiaereo):
     """Representa una batería anti-aérea"""
     NOMBRE     = "Batería"
-    ICONO      = iconos['Bateria']
+    ICONO      = g_iconos['Bateria']
     DESC       = 'Único medio antiaéreo con capacidad de vigilancia.'
     PRECIO     = 90
     HUELLA     = 100
@@ -344,14 +344,14 @@ class Inteligencia(MedioEstrategico):
     """Clase genérica para representar inteligencia"""
     NOMBRE     = "Inteligencia"
     PRECIO     = 50
-    ICONO      = iconos['Inteligencia']
+    ICONO      = g_iconos['Inteligencia']
     DESC       = 'Medio estratégico que permite obtener diversa información sobre el adversario.'
 
 class Infraestructura(MedioEstrategico):
     """Clase genérica que representa una infraestructura"""
     NOMBRE     = "Infraestructura"
     PRECIO     = 100
-    ICONO      = iconos['Infraestructura']
+    ICONO      = g_iconos['Infraestructura']
     DESC       = 'Medio estratégico que permite aumentar el nivel de las ciudades y las bases propias.'
 
 class Casilla:
@@ -595,7 +595,7 @@ class Reglamento:
         self.origen = (x, y)
 
         # Calcular numero de paginas totales
-        fuente = fuentes[self.TAMANO_FUENTE]
+        fuente = g_fuentes[self.TAMANO_FUENTE]
         lineas = dividir_texto(self.REGLAS, fuente, self.panel.rect.w - 2 * self.MARGEN_INTERNO)
         self.paginas = math.ceil(len(lineas) / self.LINEAS_POR_PAGINA)
         self.pagina = 0
@@ -752,7 +752,7 @@ class Boton:
             if not tamaño in TEXTO_TAMANOS:
                 tamaño = BOTON_TAMANO_LETRA
             self.texto = texto
-            self.imagen = fuentes[tamaño].render(texto, True, (0, 0, 0))
+            self.imagen = g_fuentes[tamaño].render(texto, True, (0, 0, 0))
         else:
             self.imagen = imagen
         x, y = self.imagen.get_size()
@@ -783,9 +783,9 @@ class Boton:
 
         # Mostrar información en el panel informativo
         if self.selec and self.info:
-            global texto_ayuda
+            global g_ayuda
             g_info.escribir(self.info)
-            texto_ayuda = self.ayuda
+            g_ayuda = self.ayuda
 
         # Ejecutar acción si está pulsado
         if self.pulsado:
@@ -801,7 +801,7 @@ class Boton:
         self.surface.blit(self.imagen, (x + 2, y + 2))
         if not self.indice:
             return
-        fuente = fuentes[AYUDA_TAMANO]
+        fuente = g_fuentes[AYUDA_TAMANO]
         w1, h1 = self.dim
         w2, h2 = fuente.size(str(self.indice))
         texto(str(self.indice), (x + w1 - 2, y + h1 - h2), AYUDA_TAMANO, (0, 0, 0), 'd', surface=self.surface)
@@ -825,10 +825,10 @@ def ayuda():
     """Muestra un pequeño rectángulo con información de ayuda y las info asociada a cada producto cuando el ratón esta sobre su botón"""
     x, y = g_raton
     pos = (x - 80, y + 20)
-    fuente = fuentes[AYUDA_TAMANO]
-    dim = fuente.size(texto_ayuda)
+    fuente = g_fuentes[AYUDA_TAMANO]
+    dim = fuente.size(g_ayuda)
     pygame.draw.rect(g_pantalla, AYUDA_COLOR, pos + dim)
-    texto(texto_ayuda, pos, AYUDA_TAMANO)
+    texto(g_ayuda, pos, AYUDA_TAMANO)
 
 def texto(
         cadena,
@@ -848,7 +848,7 @@ def texto(
         tamaño = TEXTO_TAMANO
 
     # Ajustamos la posicion para respetar el alineado
-    fuente = fuentes_mono[tamaño] if mono else fuentes[tamaño]
+    fuente = g_fuentes_mono[tamaño] if mono else g_fuentes[tamaño]
     longitud = fuente.size(cadena)[0]
     x = posicion[0] - (longitud if alineado == 'd' else longitud / 2 if alineado == 'c' else 0)
     y = posicion[1]
@@ -915,7 +915,7 @@ def texto_multilinea(
     """
     if not tamaño in TEXTO_TAMANOS:
         tamaño = TEXTO_TAMANO
-    fuente = fuentes_mono[tamaño] if mono else fuentes[tamaño]
+    fuente = g_fuentes_mono[tamaño] if mono else g_fuentes[tamaño]
     x, y = posicion
     lineas = dividir_texto(cadena.replace('\t', '    '), fuente, max_ancho)
     paginas = math.ceil(len(lineas) / max_alto)
@@ -935,7 +935,7 @@ def actualizar_fondo():
 
 def actualizar_paneles():
     """Actualizar el contenido de cada panel"""
-    for panel in paneles.values():
+    for panel in g_paneles.values():
         panel.dibujar()
     for boton in g_botones.values():
         boton.actualizar()
@@ -943,7 +943,7 @@ def actualizar_paneles():
 
 def actualizar_textos():
     """Actualizar textos en pantalla"""
-    texto(f"Crédito: {g_jugador.credito}M", (ANCHURA * ANCHURA_JUEGO + sep, sep), 24)
+    texto(f"Crédito: {g_jugador.credito}M", (ANCHURA * ANCHURA_JUEGO + PANEL_SEPARACION, PANEL_SEPARACION), 24)
     texto('Tienda', (ANCHURA * (ANCHURA_JUEGO + 1) / 2, 65), 24, alineado = 'c', subrayado = True)
     g_info.dibujar()
 
@@ -963,7 +963,7 @@ def actualizar_escenario():
 def siguiente_fotograma():
     """Avanzar fotograma"""
     pygame.display.flip() # Renderizar fotograma en pantalla y cambiar buffer
-    clock.tick(FPS)       # Avanzar reloj y limitar frecuencia de fotogramas
+    g_reloj.tick(FPS)       # Avanzar reloj y limitar frecuencia de fotogramas
 
 def siguiente_fase():
     """Avanzar a la siguiente fase del juego"""
@@ -975,16 +975,16 @@ def siguiente_fase():
 
 def actualizar_variables():
     """Actualizacion de variables en cada fotograma"""
-    global texto_ayuda, g_raton
-    texto_ayuda = None
+    global g_ayuda, g_raton
+    g_ayuda = None
     g_info.borrar()
     g_raton = pygame.mouse.get_pos()
 
 def actualizar_fase_pantallazo():
     """Dibujar pantallazo inicial"""
-    x = (g_pantalla.get_width() - imagen_pantallazo.get_width()) / 2
-    y = (g_pantalla.get_height() - imagen_pantallazo.get_height()) / 2
-    g_pantalla.blit(imagen_pantallazo, (x, y))
+    x = (g_pantalla.get_width() - g_pantallazo.get_width()) / 2
+    y = (g_pantalla.get_height() - g_pantallazo.get_height()) / 2
+    g_pantalla.blit(g_pantallazo, (x, y))
 
 def actualizar_fase_reglas():
     """Dibujar pantallazo reglas"""
@@ -1000,7 +1000,7 @@ def actualizar_fase_turnos():
     actualizar_paneles()
     actualizar_textos()
     actualizar_escenario()
-    if texto_ayuda:
+    if g_ayuda:
         ayuda()
     if g_mostrar_reglas:
         actualizar_fase_reglas()
@@ -1015,7 +1015,7 @@ if MUSICA_REPRODUCIR:
 
 # Configurar paneles
 sep = PANEL_SEPARACION
-paneles = {
+g_paneles = {
     'escenario':   Panel((sep, sep), (ANCHURA * ANCHURA_JUEGO - 1.5 * sep, ALTURA * ALTURA_JUEGO - 1.5 * sep), 'escenario'),
     'acciones':    Panel((ANCHURA * ANCHURA_JUEGO + sep / 2, sep), (ANCHURA * ANCHURA_ACCIONES - 1.5 * sep, ALTURA * ALTURA_ACCIONES - 1.5 * sep)),
     'informacion': Panel((sep, ALTURA * ALTURA_JUEGO + sep / 2), (ANCHURA - 2 * sep, ALTURA * ALTURA_INFORMACION - 1.5 * sep), 'información')
@@ -1023,8 +1023,8 @@ paneles = {
 
 # Inicializar algunas variables globales
 g_productos = [AvionCaza, AvionAtaque, AvionTransporte, Helicoptero, Dron, Radar, Bateria, Inteligencia, Infraestructura]
-g_escenario = Escenario(paneles['escenario'])     # Casillas del mapa y su contenido
-g_info      = Informacion(paneles['informacion']) # Panel informativo inferior
+g_escenario = Escenario(g_paneles['escenario'])     # Casillas del mapa y su contenido
+g_info      = Informacion(g_paneles['informacion']) # Panel informativo inferior
 g_reglas    = Reglamento()                        # Paginador de reglas
 g_fase      = Fase.PANTALLAZO                     # Inicializar juego en la primera fase
 g_jugadores = [Jugador() for _ in range(2)]       # Lista de jugadores
