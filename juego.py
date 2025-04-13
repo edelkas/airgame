@@ -388,6 +388,15 @@ class Casilla:
             self.jugador = None
 
         # Determinar coeficientes de superioridad de la casilla y actuales
+        self.resetear()
+        self.colorear()
+
+        # Calcular posicion en el mapa y coordenadas de cada vertice
+        self.centro = pygame.math.Vector2(Escenario.ORIGEN_X + self.DIM_X * (x + (y % 2) / 2), Escenario.ORIGEN_Y + self.DIM_Y * y)
+        self.verts = [self.centro + v for v in esc.hex_vertices]
+
+    def resetear(self):
+        """Resetear contenido de la celda"""
         self.supCas = SUP_NORMAL
         if self.jugador == 1:
             self.sup = self.supCas
@@ -395,11 +404,6 @@ class Casilla:
             self.sup = -self.supCas
         else:
             self.sup = 0
-        self.colorear()
-
-        # Calcular posicion en el mapa y coordenadas de cada vertice
-        self.centro = pygame.math.Vector2(Escenario.ORIGEN_X + self.DIM_X * (x + (y % 2) / 2), Escenario.ORIGEN_Y + self.DIM_Y * y)
-        self.verts = [self.centro + v for v in esc.hex_vertices]
 
     def raton(self, pos_vec):
         """Detecta si el ratón está sobre la casilla. Aproximamos el hexágono por el círculo inscrito."""
@@ -408,16 +412,15 @@ class Casilla:
     def colorear(self):
         """Determinar color"""
         if self.sup <= -MULTIPLICADOR_SUPREMACIA * self.supCas:
-            color = MAPA_COLOR_CASILLA_J2_F
+            self.color = MAPA_COLOR_CASILLA_J2_F
         elif self.sup <= -self.supCas:
-            color = MAPA_COLOR_CASILLA_J2
+            self.color = MAPA_COLOR_CASILLA_J2
         elif self.sup < self.supCas:
-            color = MAPA_COLOR_CASILLA_NEUTRO
+            self.color = MAPA_COLOR_CASILLA_NEUTRO
         elif self.sup < MULTIPLICADOR_SUPREMACIA * self.supCas:
-            color = MAPA_COLOR_CASILLA_J1
+            self.color = MAPA_COLOR_CASILLA_J1
         else:
-            color = MAPA_COLOR_CASILLA_J1_F
-        self.color = pygame.Color(color)
+            self.color = MAPA_COLOR_CASILLA_J1_F
 
     def dibujar(self, surface):
         """Dibujar casilla en pantalla"""
@@ -445,15 +448,31 @@ class Escenario:
 
         # Array de casillas
         self.casillas = [[Casilla(self, x, y) for y in range(MAPA_DIM_Y)] for x in range(MAPA_DIM_X)]
-        supremacia = int(MAPA_DIM_J * MAPA_DIM_Y * SUP_INICIAL)
-        for jugador in range(1, 3):
-            casillas = [c for col in self.casillas for c in col if c.jugador == jugador]
-            for casilla in random.sample(casillas, supremacia):
-                casilla.sup *= 2
+        self.semillear()
 
         # Casillas especiales
         self.casilla_sobre = None # Casilla actualmente seleccionada con el raton
         self.casilla_pulsa = None # Casilla actualmente pulsada por el raton
+
+    def semillear(self):
+        """Cambiar la seleccion de celdas aleatorias que tienen supremacia inicial (OJO: resetea las celdas!)"""
+        # Resetear los valores de superioridad
+        for col in self.casillas:
+            for casilla in col:
+                casilla.resetear()
+
+        # Generar nuevas casillas aleatorias con supremacia
+        supremacia = int(MAPA_DIM_J * MAPA_DIM_Y * SUP_INICIAL)
+        for jugador in range(1, 3):
+            casillas = [c for col in self.casillas for c in col if c.jugador == jugador]
+            for casilla in random.sample(casillas, supremacia):
+                casilla.sup *= MULTIPLICADOR_SUPREMACIA
+                casilla.colorear()
+
+        # Reajustar los colores de las casillas
+        for col in self.casillas:
+            for casilla in col:
+                casilla.colorear()
 
     def actualizar(self):
         """Detectar si alguna casilla esta seleccionada o ha sido pulsada"""
@@ -499,10 +518,11 @@ class Informacion:
         self.texto = None
         x, y, w, h = self.panel.rect
         self.botones = [
-            Boton((0, 0), texto="Reglas", accion=g_reglas.mostrar)
+            Boton((0, 0), texto="Semilla", accion=g_escenario.semillear),
+            Boton((0, 0), texto="Reglas",  accion=g_reglas.mostrar)
         ]
-        b = self.botones[-1]
-        b.mover(x + w - b.dim[0], y + h - b.dim[1])
+        for i, b in enumerate(reversed(self.botones)):
+            b.mover(x + w - b.dim[0], y + h - (i + 1) * b.dim[1])
 
     def escribir(self, texto):
         """Cambiar el texto del panel"""
