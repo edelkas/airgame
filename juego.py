@@ -56,6 +56,11 @@ FPS                             = 60        # Fotogramas por segundo
 COLOR_FONDO                     = "#cccccc" # Color RGB del fondo de pantalla
 MUSICA_REPRODUCIR               = False     # Activar o desactivar la música por defecto
 
+# Carpetas de ficheros del juego
+CARPETA_AUDIO      = "audio" # Localización de los sonidos y música
+CARPETA_IMAGENES   = "img"   # Localización de las imágenes, sprites, etc
+CARPETA_DOCUMENTOS = "docs"  # Localización de la documentación del juego
+
 # Propiedades del texto
 COLOR_TEXTO        = (0, 0, 0)        # Color RGB por defecto del texto
 TEXTO_FUENTE       = "Century Gothic" # Fuente de los textos
@@ -135,11 +140,14 @@ AYUDA_TAMANO = 16             # Tamaño de la letra
 #                          INICIALIZACION INTERFAZ
 # < -------------------------------------------------------------------------- >
 
-# Función que permite cargar imágenes de nuestro archivo y mostrarlas en pantalla
 def cargar_imagen(nombre, trans=True):
     """Cargar un fichero de imagen en PyGame"""
-    img = pygame.image.load(nombre)
+    img = pygame.image.load(os.path.join(CARPETA_IMAGENES, nombre))
     return img.convert_alpha() if trans else img.convert()
+
+def cargar_sonido(nombre):
+    """Cargar un fichero de audio en PyGame"""
+    return pygame.mixer.Sound(os.path.join(CARPETA_AUDIO, nombre))
 
 # Configuramos la pantalla (nombre, dimensiones, fotogramaje, etc)
 flags = 0
@@ -153,7 +161,7 @@ texto_ayuda = None
 
 # Cargar recursos
 pygame.mixer.init()
-pygame.mixer.music.load(MUSICA_FONDO)
+pygame.mixer.music.load(os.path.join(CARPETA_AUDIO, MUSICA_FONDO))
 imagen_pantallazo = cargar_imagen(IMAGEN_FONDO)
 fuentes = { tam: pygame.font.SysFont(TEXTO_FUENTE, tam) for tam in TEXTO_TAMANOS }
 fuentes_mono = { tam: pygame.font.SysFont(TEXTO_FUENTE_MONO, tam) for tam in TEXTO_TAMANOS }
@@ -169,8 +177,8 @@ iconos = {
     'Infraestructura': cargar_imagen('icono_infraestructura.png'),
 }
 g_sonidos = {
-    'dinero': pygame.mixer.Sound(SONIDO_DINERO),
-    'error':  pygame.mixer.Sound(SONIDO_ERROR),
+    'dinero': cargar_sonido(SONIDO_DINERO),
+    'error':  cargar_sonido(SONIDO_ERROR),
 }
 
 # < -------------------------------------------------------------------------- >
