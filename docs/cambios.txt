@@ -1,29 +1,46 @@
-Conceptuales:
-  - Ahora todo el programa tiene un sistema de fases por las que se va cambiado, en lugar
-    de basarnos en tiempos como antes: pantallazo, reglas, turnos, etc.
-
 Clases:
   - Añadida la clase Casilla, que contiene toda la información necesaria de una casilla, y
-    se encarga de dibujarla. El tamaño y el color se calculan automáticamente en función
+    se encarga mantener sus infraestructuras, dibujar en pantalla, etc. Se puede destacar
+    pasando el ratón por encima, y seleccionar pulsando.
+    El tamaño y el color se calculan automáticamente en función
     del tamaño del tablero, de los coeficientes de superioridad, etc.
   - Añadida la clase Escenario, que mantiene el array de Casillas y se encarga de actualizarlo
     cada fotograma.
   - Añadida la clase Informacion, que se encarga de almacenar y mostrar la información en el panel
-    inferior de manera ordenada.
+    inferior de manera ordenada. También tiene botones de opciones, por ejemplo para volver a
+    ver las reglas o reiniciar la partida.
   - Añadida la clase Reglamento, que almacena y muestra las reglas en un panel nuevo que se puede
     abrir y cerrar. Tiene paginación incorporada, y sólo se renderiza de nuevo cuando algo
     ha cambiado, por eficiencia.
-  - Añadida la clase Jugador, que mantiene su estado (inventario, credito, etc).
-  - Añadida la clase Tienda, que mantiene los medios y sus botones.
-  
+  - Añadida la clase Jugador, que mantiene su estado (inventario, credito, etc). Permite adquirir
+    medios, recibir cobros, etc.
+  - Añadida la clase Tienda, que mantiene los medios y sus botones, renderiza en pantalla, etc.
+  - Las clases que ya existían (e.g. Panel o Boton) se han mejorando notablemente.
+
+Conceptuales:
+  - Ahora todo el programa tiene un sistema de fases por las que se va cambiado, en lugar
+    de basarnos en tiempos como antes. Por ejemplo, fase de pantallazo, de reglas, de turnos, etc.
+  - Muchas de las clases tienen las siguientes funciones comunes:
+    * Actualizar: Se llama cada fotograma, y se encarga de mantener al corriente los elementos
+                  de la misma, reaccionar a las acciones del ratón, cambiar elementos, etc.
+    * Resetear:   Devuelve al objeto a su estado inicial.
+    * Renderizar: Actualiza los gráficos internamente, sólo si ha habido cambios.
+    * Dibujar:    Dibuja el objeto en pantalla. Se llama cada fotograma.
+
 Estéticos:
-  - Alineamiento de varias partes del código.
-  - Sonidos: Más, y recortados mejor los viejos.
-  - Todas las variables globales prefijadas con "g_" para distinguirlas más fácilmente.
+  - Todas las variables globales van ahora prefijadas con "g_" para distinguirlas más fácilmente.
+  - Añadido un sistema de texturas, se pueden usar en paneles, botones, y demás elementos.
+  - Sonidos: Añadidos nuevos, y recortados mejor los viejos.
 
 Organización código:
-  - Las constantes mejor definirlas arriba (no en medio del código) y sean datos primitivos.
-    Por ejemplo, en lugar de que los sonidos sean una constante, la constante es el nombre
-    del fichero, y luego simplemente se define una variable que es un diccionario de sonidos.
-  - Añadido algunas configuraciones que permiten desarrollar más cómodamente (e.g. desactivar
-    pantallazo, música, etc.).
+  - Reestructurado el código del juego en carpetas:
+    * img:   Para guardar todas las imágenes.
+    * audio: Para guardar todos los sonidos y la música.
+    * docs:  Para guardar los documentos (reglas, cambios, etc).
+  - La filosofía general del código se ha mantenido (las secciones, etc).
+  - He creado un repositorio de GitHub para poder trackear y compartir los cambios:
+    * Enlace:  https://github.com/edelkas/airgame
+    * Cambios: https://github.com/edelkas/airgame/commits/master/
+  - Movido todas las constantes arriba (no en medio del código), y que sean datos primitivos.
+    Cada clase, además, también tiene sus propias constantes. Añadidas muchas.
+  - En líneas generales, he mejorado las funciones que existían antes y el flujo general.

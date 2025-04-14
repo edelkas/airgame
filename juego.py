@@ -99,6 +99,17 @@ SONIDO_BOTON_SEL   = 'click.ogg'
 SONIDO_BOTON_PUL   = 'switch.ogg'
 SONIDO_CASILLA_SEL = 'glass.ogg'
 SONIDO_CASILLA_PUL = 'casilla.ogg'
+TEXTURA_ESCENARIO  = 'textura_hierba.png'
+TEXTURA_TIENDA     = 'textura_ladrillos.png'
+TEXTURA_INFO       = 'textura_piedras.png'
+TEXTURA_REGLAS     = 'textura_malla.png'
+TEXTURA_BOTON      = 'textura_gotele.png'
+
+TEXTURA_ESCENARIO_COLOR = '#33cc3340'
+TEXTURA_TIENDA_COLOR    = '#cc330080'
+TEXTURA_INFO_COLOR      = '#66669920'
+TEXTURA_REGLAS_COLOR    = '#80808020'
+TEXTURA_BOTON_COLOR     = '#0675ac20'
 
 # Escenario
 MAPA_DIM_X = 25 # Anchura del mapa en casillas
@@ -129,6 +140,30 @@ def cargar_imagen(nombre, trans=True):
     """Cargar un fichero de imagen en PyGame"""
     img = pygame.image.load(os.path.join(CARPETA_IMAGENES, nombre))
     return img.convert_alpha() if trans else img.convert()
+
+def cargar_textura(nombre, color, fondo = '#000000'):
+    """
+    Cargar una imagen para usar como textura monocromo. Las texturas suelen ser en blanco
+    y negro: el blanco se tinta de un color, y el negro se hace transparente.
+    """
+    imagen = cargar_imagen(nombre)
+
+    # Tintar blanco
+    imagen.fill(color, special_flags = pygame.BLEND_RGBA_MULT)
+
+    # Transparentar negro
+    fondo = pygame.Color(fondo)
+    r1, g1, b1 = fondo.r, fondo.g, fondo.b
+    w, h = imagen.get_size()
+    imagen.lock()
+    for y in range(h):
+        for x in range(w):
+            r2, g2, b2, _ = imagen.get_at((x, y))
+            if (r2, g2, b2) == (r1, g1, b1):
+                imagen.set_at((x, y), (r2, g2, b2, 0))
+    imagen.unlock()
+
+    return imagen
 
 def cargar_sonido(nombre):
     """Cargar un fichero de audio en PyGame"""
@@ -174,6 +209,13 @@ g_sonidos = {
     'boton_pul':   cargar_sonido(SONIDO_BOTON_PUL),
     'casilla_sel': cargar_sonido(SONIDO_CASILLA_SEL),
     'casilla_pul': cargar_sonido(SONIDO_CASILLA_PUL)
+}
+g_texturas = {
+    'hierba':    cargar_textura(TEXTURA_ESCENARIO, TEXTURA_ESCENARIO_COLOR),
+    'ladrillos': cargar_textura(TEXTURA_TIENDA,    TEXTURA_TIENDA_COLOR),
+    'piedras':   cargar_textura(TEXTURA_INFO,      TEXTURA_INFO_COLOR),
+    'malla':     cargar_textura(TEXTURA_REGLAS,    TEXTURA_REGLAS_COLOR),
+    'gotele':    cargar_textura(TEXTURA_BOTON,     TEXTURA_BOTON_COLOR),
 }
 
 # < -------------------------------------------------------------------------- >
@@ -342,7 +384,7 @@ class Infraestructura(MedioEstrategico):
     def __init__(self, jugador):
         self.jugador = jugador
         self.nivel = 1
-    
+
     def mejorar(self):
         """Mejorar el nivel y las propiedades de la infraestructura"""
         if self.jugador.pagar(self.PRECIO_MEJORA):
@@ -446,7 +488,7 @@ class Casilla:
     def raton(self, pos_vec):
         """Detecta si el ratón está sobre la casilla. Aproximamos el hexágono por el círculo inscrito."""
         return pos_vec.distance_squared_to(self.centro) < self.INRADIO ** 2
-    
+
     def hay_superioridad(self):
         """Detecta si el jugador actual tiene superioridad aérea en la casilla"""
         return g_jugador.indice == 0 and self.sup >= self.supCas or g_jugador.indice == 1 and self.sup <= self.supCas
@@ -454,7 +496,7 @@ class Casilla:
     def hay_supremacia(self):
         """Detecta si el jugador actual tiene supremacia aérea en la casilla"""
         return g_jugador.indice == 0 and self.sup >= MULT_SUPREMACIA * self.supCas or g_jugador.indice == 1 and self.sup <= MULT_SUPREMACIA * self.supCas
-    
+
     def colorear(self):
         """Determinar color"""
         if self.sup <= -MULT_SUPREMACIA * self.supCas:
@@ -719,12 +761,9 @@ class Reglamento:
 
     def __init__(self):
         # Crear superficie auxiliar con todo el contenido, para evitar re-renderizar cada fotograma
-        dim = (ANCHURA - 2 * self.MARGEN_EXTERNO, ALTURA - 2 * self.MARGEN_EXTERNO)
-        self.surface = pygame.Surface(dim, pygame.SRCALPHA)
-        self.panel = Panel((0,0), dim, radio=20, color=self.COLOR_FONDO, surface=self.surface)
-        x = (g_pantalla.get_width() - self.surface.get_width()) / 2
-        y = (g_pantalla.get_height() - self.surface.get_height()) / 2
-        self.origen = (x, y)
+        x, y = (self.MARGEN_EXTERNO, self.MARGEN_EXTERNO)
+        dim = (ANCHURA - 2 * x, ALTURA - 2 * y)
+        self.panel = Panel((x, y), dim, radio=20, color=self.COLOR_FONDO, textura='malla')
         self.visible = False
 
         # Calcular numero de paginas totales
@@ -734,12 +773,12 @@ class Reglamento:
         self.pagina = 0
 
         # Botones de control
-        x, y, w, h = self.panel.rect
-        y += self.TAMANO_TITULO + 10 + self.LINEAS_POR_PAGINA * fuente.get_linesize() + 40
+        w = self.panel.rect.w
+        dy = self.TAMANO_TITULO + 10 + self.LINEAS_POR_PAGINA * fuente.get_linesize() + 40
         self.botones = [
-            Boton((0, y), origen=self.origen, texto='Anterior',  tamaño=self.TAMANO_BOTONES, accion=self.pagina_anterior,  surface=self.surface),
-            Boton((0, y), origen=self.origen, texto='Siguiente', tamaño=self.TAMANO_BOTONES, accion=self.pagina_siguiente, surface=self.surface),
-            Boton((0, y), origen=self.origen, texto='Salir',     tamaño=self.TAMANO_BOTONES, accion=self.resetear,         surface=self.surface)
+            Boton((0, dy), texto='Anterior',  tamaño=self.TAMANO_BOTONES, accion=self.pagina_anterior,  surface=self.panel.lienzo, origen=(x,y)),
+            Boton((0, dy), texto='Siguiente', tamaño=self.TAMANO_BOTONES, accion=self.pagina_siguiente, surface=self.panel.lienzo, origen=(x,y)),
+            Boton((0, dy), texto='Salir',     tamaño=self.TAMANO_BOTONES, accion=self.resetear,         surface=self.panel.lienzo, origen=(x,y))
         ]
         anchura = sum(boton.dim[0] for boton in self.botones) + 10 * (len(self.botones) - 1)
         diff = 0
@@ -754,11 +793,11 @@ class Reglamento:
     def renderizar(self):
         """Renderizar el contenido del reglamento. Hay que llamarlo cada vez que cambie (e.g. al paginar)."""
         x, y, w, h = self.panel.rect
-        self.panel.dibujar()
-        texto('REGLAS', (x + ANCHURA / 2, y), color=self.COLOR_TEXTO, tamaño=self.TAMANO_TITULO, alineado_h='c', surface=self.surface)
+        self.panel.renderizar()
+        texto('REGLAS', (x + ANCHURA / 2, y), color=self.COLOR_TEXTO, tamaño=self.TAMANO_TITULO, alineado_h='c', surface=self.panel.lienzo)
         texto_multilinea(
             Reglamento.REGLAS, (x + self.MARGEN_INTERNO, y + self.TAMANO_TITULO + 10), color=self.COLOR_TEXTO, tamaño=self.TAMANO_FUENTE,
-            max_ancho=w-2*self.MARGEN_INTERNO, max_alto=self.LINEAS_POR_PAGINA, surface=self.surface, pagina=self.pagina
+            max_ancho=w-2*self.MARGEN_INTERNO, max_alto=self.LINEAS_POR_PAGINA, surface=self.panel.lienzo, pagina=self.pagina
         )
         for boton in self.botones:
             boton.dibujar()
@@ -804,7 +843,7 @@ class Reglamento:
     def dibujar(self):
         """Dibujar el reglamento en pantalla. Hay que llamarlo cada fotograma."""
         if self.visible:
-            g_pantalla.blit(self.surface, self.origen)
+            self.panel.dibujar()
 
 class Jugador:
     """Representa a cada uno de los jugadores"""
@@ -827,7 +866,7 @@ class Jugador:
         if medio in self.inventario:
             self.inventario[medio] += 1
             g_tienda.botones[medio].indice = self.inventario[medio]
-    
+
     def pagar(self, cantidad):
         """Desembolsar una cierta cantidad, si hay crédito disponible"""
         if self.credito < cantidad:
@@ -910,15 +949,16 @@ class Panel:
     """Clase que representa un panel que contiene informacion"""
     def __init__(
             self,
-            pos, # Posicion (par de coordenadas)
-            dim, # Dimensiones (par de coordenadas)
+            pos,                              # Posicion del panel en la superficie
+            dim,                              # Dimensiones del panel
             nombre      = None,               # Nombre del panel
             color       = PANEL_INT_COLOR,    # Color del interior
             color_borde = PANEL_BORDE_COLOR,  # Color del borde
             grosor      = PANEL_BORDE_GROSOR, # Grosor del borde
             radio       = PANEL_BORDE_RADIO,  # Radio de curvatura de las esquinas
             surface     = g_pantalla,         # Superficie donde dibujar panel
-            origen      = (0, 0)              # Posicion de la superficie en la pantalla
+            origen      = (0, 0),             # Posicion de la superficie en la pantalla
+            textura     = None                # Textura para teselar el fondo del panel
         ):
         # Guardar parámetros del panel
         self.pos         = pos
@@ -930,9 +970,30 @@ class Panel:
         self.nombre      = nombre
         self.surface     = surface
         self.origen      = origen
+        self.lienzo      = pygame.Surface(dim, pygame.SRCALPHA)
+        self.textura     = g_texturas[textura] if textura else None
 
         # Crear otros elementos útiles
         self.rect = pygame.Rect(pos, dim)
+        self.renderizar()
+
+    def renderizar(self):
+        """Pre-renderizar el panel. Solo hace falta hacer esto una vez, pues su contenido no cambia."""
+        # Interior
+        pygame.draw.rect(self.lienzo, self.color, (0, 0) + self.dim, border_radius = self.radio)
+        if self.textura:
+            w, h = self.textura.get_size()
+            for y in range(0, int(self.dim[1]), h):
+                for x in range(0, int(self.dim[0]), w):
+                    self.lienzo.blit(self.textura, (x, y))
+
+        # Borde
+        if self.grosor > 0 and self.color_borde:
+            pygame.draw.rect(self.lienzo, self.color_borde, (0, 0) + self.dim, width = self.grosor, border_radius = self.radio)
+
+        # Nombre
+        if self.nombre:
+            texto(self.nombre.capitalize(), (self.dim[0] / 2, 0), tamaño = 24, alineado_h = 'c', subrayado = True, surface = self.lienzo)
 
     def mover(self, dx, dy):
         """Cambiar la posicion del panel"""
@@ -941,16 +1002,7 @@ class Panel:
 
     def dibujar(self):
         """Dibujar el panel rectangular en pantalla"""
-        # Interior
-        pygame.draw.rect(self.surface, self.color, self.pos + self.dim, border_radius = self.radio)
-
-        # Borde
-        if self.grosor > 0 and self.color_borde:
-            pygame.draw.rect(self.surface, self.color_borde, self.pos + self.dim, width = self.grosor, border_radius = self.radio)
-
-        # Nombre
-        if self.nombre:
-            texto(self.nombre.capitalize(), (self.pos[0] + self.dim[0] / 2, self.pos[1]), tamaño = 24, alineado_h = 'c', subrayado = True, surface = self.surface)
+        self.surface.blit(self.lienzo, self.pos)
 
     def raton(self):
         """Devuelve si el raton está sobre el panel"""
@@ -959,7 +1011,7 @@ class Panel:
 class Boton:
     """Clase que representa un boton clickable"""
     def __init__(
-            self, pos, origen=(0,0), texto=None, tamaño=BOTON_TAMANO_LETRA, imagen=None, ayuda=None,
+            self, pos, origen=(0,0), texto=None, tamaño=BOTON_TAMANO_LETRA, imagen=None, ayuda=None, textura='gotele',
             info=None, indice=None, accion=None, args=(), surface=g_pantalla, audio_sel='boton_sel', audio_pul='boton_pul'
         ):
         if not texto and not imagen:
@@ -975,6 +1027,7 @@ class Boton:
         self.indice    = indice    # Pequeño número que aparezca en la esquina del botón
         self.audio_sel = audio_sel # Sonido que se reproduce al seleccionar el boton
         self.audio_pul = audio_pul # Sonido que se reproduce al pulsar el boton
+        self.textura   = textura   # Textura a usar para el boton
 
         # Calculamos el tamaño del boton
         if texto:
@@ -988,7 +1041,7 @@ class Boton:
         self.dim = (x + 5, y + 5) # Dimensiones del botón
 
         # Otros elementos
-        self.panel = Panel(self.pos, self.dim, None, BOTON_COLOR_NORMAL, surface=self.surface, origen=origen)
+        self.panel = Panel(self.pos, self.dim, None, BOTON_COLOR_NORMAL, surface=self.surface, origen=origen, textura=self.textura)
 
         self.resetear()
 
@@ -999,11 +1052,12 @@ class Boton:
 
     def actualizar(self):
         """Actualizar estado y propiedades del boton"""
-        # Cambiar estado (seleccionado / pulsado) y detectar cambios
+        # Modificar estado (seleccionado / pulsado) y detectar cambios
         selec_antes = self.selec
         pulsado_antes = self.pulsado
         self.selec = self.panel.raton()
         self.pulsado = self.selec and g_click
+        cambio = selec_antes != self.selec or pulsado_antes != self.pulsado
 
         # Reproducir sonidos
         if not selec_antes and self.selec and self.audio_sel:
@@ -1011,13 +1065,15 @@ class Boton:
         if not pulsado_antes and self.pulsado and self.audio_pul:
             reproducir_sonido(self.audio_pul)
 
-        # Actualizar color
+        # Actualizar color y renderizar boton
         if self.pulsado:
             self.panel.color = BOTON_COLOR_PULSA
         elif self.selec:
             self.panel.color = BOTON_COLOR_SOBRE
         else:
             self.panel.color = BOTON_COLOR_NORMAL
+        if cambio:
+            self.renderizar()
 
         # Mostrar información en el panel informativo
         if self.selec and self.info:
@@ -1032,17 +1088,20 @@ class Boton:
         # Devolver si ha habido cambio de estado
         return selec_antes != self.selec or pulsado_antes != self.pulsado
 
-    def dibujar(self):
-        """Renderizar el boton en pantalla"""
-        x, y = self.pos
-        self.panel.dibujar()
-        self.surface.blit(self.imagen, (x + 2, y + 2))
+    def renderizar(self):
+        """Volver a renderizar el contenido del boton. Solo hace falta hacerlo cuando ha cambiado."""
+        self.panel.renderizar()
+        self.panel.lienzo.blit(self.imagen, (2, 2))
         if not self.indice:
             return
         fuente = g_fuentes[AYUDA_TAMANO]
         w1, h1 = self.dim
         w2, h2 = fuente.size(str(self.indice))
-        texto(str(self.indice), (x + w1 - 2, y + h1 - h2), tamaño = AYUDA_TAMANO, color = "#ff0000", alineado_h = 'd', surface = self.surface)
+        texto(str(self.indice), (w1 - 2, h1 - h2), tamaño = AYUDA_TAMANO, color = "#ff0000", alineado_h = 'd', surface = self.panel.lienzo)
+
+    def dibujar(self):
+        """Dibujar el botón en pantalla. Hay que llamarlo cada fotograma."""
+        self.panel.dibujar()
 
     def resetear(self):
         """Reiniciar los valores del botón <<a fábica>>"""
@@ -1050,6 +1109,7 @@ class Boton:
         self.pulsado = False # Verdadero si el botón está siendo pulsado
         if self.indice:
             self.indice = 0
+        self.renderizar()
 
 class Fase(enum.IntEnum):
     """Representa cada posible fase del juego"""
@@ -1275,9 +1335,9 @@ if MUSICA_REPRODUCIR:
 # Configurar paneles
 sep = PANEL_SEPARACION
 paneles = {
-    'escenario':   Panel((sep, sep), (ANCHURA * ANCHURA_JUEGO - 1.5 * sep, ALTURA * ALTURA_JUEGO - 1.5 * sep)),
-    'tienda':      Panel((ANCHURA * ANCHURA_JUEGO + sep / 2, sep), (ANCHURA * ANCHURA_ACCIONES - 1.5 * sep, ALTURA * ALTURA_ACCIONES - 1.5 * sep)),
-    'informacion': Panel((sep, ALTURA * ALTURA_JUEGO + sep / 2), (ANCHURA - 2 * sep, ALTURA * ALTURA_INFORMACION - 1.5 * sep), 'información')
+    'escenario':   Panel((sep, sep), (ANCHURA * ANCHURA_JUEGO - 1.5 * sep, ALTURA * ALTURA_JUEGO - 1.5 * sep), textura='hierba'),
+    'tienda':      Panel((ANCHURA * ANCHURA_JUEGO + sep / 2, sep), (ANCHURA * ANCHURA_ACCIONES - 1.5 * sep, ALTURA * ALTURA_ACCIONES - 1.5 * sep), textura='ladrillos'),
+    'informacion': Panel((sep, ALTURA * ALTURA_JUEGO + sep / 2), (ANCHURA - 2 * sep, ALTURA * ALTURA_INFORMACION - 1.5 * sep), 'información', textura='piedras')
 }
 
 # Inicializar algunas variables globales
