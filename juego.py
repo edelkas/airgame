@@ -44,7 +44,6 @@ os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
 
 # Constantes generales del juego
 NOMBRE_JUEGO    = "AIR GAME"
-NOMBRE_DEFECTO  = "Jugador"
 CREDITO_INICIAL = 500
 
 # Características generales de la interfaz
@@ -54,7 +53,8 @@ PANTALLA_COMPLETA               = False     # Para abrir el juego en ventana com
 PANTALLA_MODIFICARDIMENSION     = False     # Para poder modificar la dimensión de la ventana
 FPS                             = 60        # Fotogramas por segundo
 COLOR_FONDO                     = "#cccccc" # Color RGB del fondo de pantalla
-MUSICA_REPRODUCIR               = False     # Activar o desactivar la música por defecto
+MUSICA_REPRODUCIR               = True      # Activar o desactivar la música por defecto
+MUSICA_VOLUMEN                  = 0.5       # Volumen relativo de la musica (0.0 - 1.0)
 
 # Carpetas de ficheros del juego
 CARPETA_AUDIO      = "audio" # Localización de los sonidos y música
@@ -87,54 +87,35 @@ ALTURA_INFORMACION  = 0.35
 BOTON_COLOR_NORMAL = "#74cefa" # Color del fondo de los botones
 BOTON_COLOR_SOBRE  = "#a9e0fb" # Color del fondo cuando el raton está encima
 BOTON_COLOR_PULSA  = "#a9b7fb" # Color del fondo cuando está pulsado
-BOTON_TAMANO_LETRA = 16              # Tamaño de la letra
+BOTON_TAMANO_LETRA = 16        # Tamaño de la letra
 
 # Recursos (sonidos, imágenes...)
 MUSICA_FONDO       = "topgunmusic.ogg"
 IMAGEN_FONDO       = "imagenairgame.png"
-SONIDO_DINERO      = "cajaregistradora.ogg"
+SONIDO_PAGAR       = "cajaregistradora.ogg"
+SONIDO_COBRAR      = "monedas.ogg"
 SONIDO_ERROR       = "error.ogg"
 SONIDO_BOTON_SEL   = 'click.ogg'
 SONIDO_BOTON_PUL   = 'switch.ogg'
 SONIDO_CASILLA_SEL = 'glass.ogg'
 SONIDO_CASILLA_PUL = 'casilla.ogg'
 
-# Pantallazo
-PANTALLAZO_COLOR_FONDO = '#325320' # Color de fondo del panel del pantallazo
-PANTALLAZO_COLOR_TEXTO = '#000000' # Color de fondo del panel del pantallazo
-PANTALLAZO_TIEMPO = 5              # Tiempo que dura el pantallazo inicial en seg
-
-# Pantallazo reglas
-PANTALLAZO_REGLAS_COLOR_FONDO = (229, 228, 226) # Color de fondo del panel del pantallazo reglas
-PANTALLAZO_REGLAS_COLOR_TEXTO = '#000000'       # Color de fondo del panel del pantallazo reglas
-PANTALLAZO_REGLAS_TIEMPO = 5                    # Tiempo que dura el pantallazo de reglas en seg
-
 # Escenario
 MAPA_DIM_X = 25 # Anchura del mapa en casillas
 MAPA_DIM_Y = 15 # Altura del mapa en casillas
 MAPA_DIM_J = 11 # Número de columnas en propiedad inicial de cada jugador
-MAPA_COLOR_CASILLA_NEUTRO = "#f2f2f2" # Color de casilla sin superioridad aerea
-MAPA_COLOR_CASILLA_J1     = "#bdd7ee" # Color de casilla con superioridad aerea de J1
-MAPA_COLOR_CASILLA_J2     = "#f8cbad" # Color de casilla con superioridad aerea de J2
-MAPA_COLOR_CASILLA_J1_F   = "#2e75b6" # Color de casilla con supremacia aerea de J1
-MAPA_COLOR_CASILLA_J2_F   = "#c55a11" # Color de casilla con supremacia aerea de J2
-MAPA_COLOR_BASE           = "#00b050" # Color del borde de una casilla con base aérea
-MAPA_COLOR_CIUDAD         = "#000000" # Color del borde de una casilla con ciudad
-MAPA_COLOR_CAPITAL        = "#c09200" # Color del borde de la casilla capital
-MAPA_COLOR_BORDE          = "#9900cc" # Color del borde de la casilla actualmente seleccionada
-MAPA_BORDE_CASILLA = 0.25 # Proporcion de anchura de la casilla que supone el borde, en caso de tener
+MAPA_COLOR_NEUTRO  = "#f2f2f2" # Color de casilla sin superioridad aerea
+MAPA_COLOR_J1      = "#bdd7ee" # Color de casilla con superioridad aerea de J1
+MAPA_COLOR_J2      = "#f8cbad" # Color de casilla con superioridad aerea de J2
+MAPA_COLOR_J1_F    = "#2e75b6" # Color de casilla con supremacia aerea de J1
+MAPA_COLOR_J2_F    = "#c55a11" # Color de casilla con supremacia aerea de J2
+MAPA_COLOR_BORDE   = "#9900cc" # Color del borde de la casilla actualmente seleccionada
+MAPA_BORDE_CASILLA = 0.25      # Proporcion de anchura de la casilla que supone el borde, en caso de tener
 
 # Sistema de puntos y superioridad aerea
-SUP_NORMAL      = 20  # Coeficiente de sup aerea en una casilla normal
-SUP_CIUDAD      = 40  # Coeficiente de sup aerea en una casilla ciudad (inicial)
-SUP_CIUDAD_INC  = 5   # Coeficiente de sup aerea en una casilla ciudad (incremento por nivel)
-SUP_BASE        = 60  # Coeficiente de sup aerea en una casilla base (inicial)
-SUP_BASE_INC    = 5   # Coeficiente de sup aerea en una casilla base (incremento por nivel)
-SUP_CAPITAL     = 100 # Coeficiente de sup aerea en una casilla capital (inicial)
-SUP_CAPITAL_INC = 5   # Coeficiente de sup aerea en una casilla capital (incremento por nivel)
+COEF_SUP        = 20  # Coeficiente de sup aerea en una casilla normal
 SUP_INICIAL     = 0.1 # Proporción de casillas iniciales con supremacia (aleatorias)
-
-MULTIPLICADOR_SUPREMACIA = 2 # Ratio entre superioridad y supremacia aerea
+MULT_SUPREMACIA = 2   # Ratio entre superioridad y supremacia aerea
 
 # Recuadros de ayuda e informacion
 AYUDA_COLOR = (255, 255, 192) # Color del fondo
@@ -182,10 +163,12 @@ g_iconos = {
     'Radar':           cargar_imagen('icono_radar.png'),
     'Bateria':         cargar_imagen('icono_bateria.png'),
     'Inteligencia':    cargar_imagen('icono_inteligencia.png'),
-    'Infraestructura': cargar_imagen('icono_infraestructura.png'),
+    'Ciudad':          cargar_imagen('icono_ciudad.png'),
+    'Base':            cargar_imagen('icono_base.png')
 }
 g_sonidos = {
-    'dinero':      cargar_sonido(SONIDO_DINERO),
+    'pagar':       cargar_sonido(SONIDO_PAGAR),
+    'cobrar':      cargar_sonido(SONIDO_COBRAR),
     'error':       cargar_sonido(SONIDO_ERROR),
     'boton_sel':   cargar_sonido(SONIDO_BOTON_SEL),
     'boton_pul':   cargar_sonido(SONIDO_BOTON_PUL),
@@ -214,24 +197,18 @@ class Medio:
     SUPAEREA   = None
 
     @classmethod
-    def ayuda(cls):
-        return "%s (%dM)" % (cls.NOMBRE, cls.PRECIO)
-
-    @classmethod
     def info(cls):
-        texto = f"""
-            Descripción:  {cls.DESC}
-            Precio:       {cls.PRECIO}
-            Velocidad:    {cls.VELOCIDAD}
-            Autonomía:    {cls.AUTONOMIA}
-            Alcance:      {cls.ALCANCE}
-            Huella:       {cls.HUELLA}
-            Aire-aire:    {cls.AIRE}
-            Aire-sup:     {cls.SUP}
-            Vigilancia:   {cls.VIGILANCIA}
-            Radio vigil.: {cls.RADIOVIG}
-            Sup. aérea:   {cls.SUPAEREA}
-        """
+        texto = f"Descripción:  {cls.DESC}\n"
+        if cls.PRECIO:     texto += f"Precio:       {cls.PRECIO}\n"
+        if cls.VELOCIDAD:  texto += f"Velocidad:    {cls.VELOCIDAD}\n"
+        if cls.AUTONOMIA:  texto += f"Autonomía:    {cls.AUTONOMIA}\n"
+        if cls.ALCANCE:    texto += f"Alcance:      {cls.ALCANCE}\n"
+        if cls.HUELLA:     texto += f"Huella:       {cls.HUELLA}\n"
+        if cls.AIRE:       texto += f"Aire-aire:    {cls.AIRE}\n"
+        if cls.SUP:        texto += f"Aire-sup:     {cls.SUP}\n"
+        if cls.VIGILANCIA: texto += f"Vigilancia:   {cls.VIGILANCIA}\n"
+        if cls.RADIOVIG:   texto += f"Radio vigil.: {cls.RADIOVIG}\n"
+        if cls.SUPAEREA:   texto += f"Sup. aérea:   {cls.SUPAEREA}"
         return re.sub(r"^\s+", "", texto, flags = re.MULTILINE)
 
 class MedioAereo(Medio):
@@ -239,9 +216,6 @@ class MedioAereo(Medio):
 
 class MedioAntiaereo(Medio):
     """Representa cualquier medio anti-aéreo"""
-    VELOCIDAD  = 0
-    AUTONOMIA  = 0
-    ALCANCE    = 0
 
 class MedioEstrategico(Medio):
     """Representa cualquier medio estratégico"""
@@ -361,10 +335,51 @@ class Inteligencia(MedioEstrategico):
 
 class Infraestructura(MedioEstrategico):
     """Clase genérica que representa una infraestructura"""
-    NOMBRE     = "Infraestructura"
-    PRECIO     = 100
-    ICONO      = g_iconos['Infraestructura']
-    DESC       = 'Medio estratégico que permite aumentar el nivel de las ciudades y las bases propias.'
+    INC     = 5 # Incremento del coeficiente de superioridad por cada nivel extra
+    BONUS   = 0 # Crédito (en M) otorgado al jugador por turno y nivel
+    NIVELES = 9 # Maximo nivel de una infraestructura
+
+    def __init__(self, jugador):
+        self.jugador = jugador
+        self.nivel = 1
+    
+    def mejorar(self):
+        """Mejorar el nivel y las propiedades de la infraestructura"""
+        if self.jugador.pagar(self.PRECIO_MEJORA):
+            self.nivel += 1
+
+    def cosechar(self):
+        """Obtener el bonus económico que otorga la infraestructura"""
+        self.jugador.cobrar(self.BONUS)
+
+class Ciudad(Infraestructura):
+    """Infraestructura que otorga recursos al jugador"""
+    NOMBRE        = "Ciudad"
+    ICONO         = g_iconos['Ciudad']
+    DESC          = "Infraestructura que cosecha recursos cada turno."
+    PRECIO = 200
+    PRECIO_MEJORA = 100
+    SUP           = 40
+    BONUS         = 10
+    COLOR         = "#000000"
+
+class Base(Infraestructura):
+    """Infraestructura que permite desplegar medios aéreos"""
+    NOMBRE        = "Base aérea"
+    ICONO         = g_iconos['Base']
+    DESC          = "Infraestructura que permite desplegar medios aéreos."
+    PRECIO = 300
+    PRECIO_MEJORA = 150
+    SUP           = 60
+    COLOR         = "#00b050"
+
+class Capital(Ciudad):
+    """Ciudad principal del jugador. Además, perderla implica perder la partida."""
+    NOMBRE        = "Capital"
+    PRECIO = 500
+    PRECIO_MEJORA = 250
+    SUP           = 100
+    COLOR         = "#c09200"
 
 class Casilla:
     ESCALA  = 0.6
@@ -378,53 +393,88 @@ class Casilla:
     def __init__(self, esc, x, y):
         self.x = x
         self.y = y
+        self.centro = pygame.math.Vector2(Escenario.ORIGEN_X + self.DIM_X * (x + (y % 2) / 2), Escenario.ORIGEN_Y + self.DIM_Y * y)
+        self.verts = [self.centro + v for v in esc.hex_vertices]
+        self.resetear()
 
-        # Determinar jugador que tiene inicialmente la superioridad aerea
-        if x < MAPA_DIM_J:
+    def resetear(self):
+        """Inicializar todas las propiedades y contenidos de la casilla"""
+        self.asignar()
+        self.destruir()
+        self.recalcular()
+        self.colorear()
+
+    def asignar(self):
+        """Determinar propietario de la casilla, que tiene inicialmente la superioridad aerea"""
+        if self.x < MAPA_DIM_J:
+            self.jugador = 0
+        elif self.x >= MAPA_DIM_X - MAPA_DIM_J:
             self.jugador = 1
-        elif x >= MAPA_DIM_X - MAPA_DIM_J:
-            self.jugador = 2
         else:
             self.jugador = None
 
-        # Determinar coeficientes de superioridad de la casilla y actuales
-        self.resetear()
-        self.colorear()
+    def recalcular(self):
+        """Recalcular coeficientes de superioridad"""
 
-        # Calcular posicion en el mapa y coordenadas de cada vertice
-        self.centro = pygame.math.Vector2(Escenario.ORIGEN_X + self.DIM_X * (x + (y % 2) / 2), Escenario.ORIGEN_Y + self.DIM_Y * y)
-        self.verts = [self.centro + v for v in esc.hex_vertices]
+        # Coeficiente de superioridad de casilla
+        infra = self.infraestructura
+        self.supCas = infra.SUP + infra.INC * infra.nivel if infra else COEF_SUP
 
-    def resetear(self):
-        """Resetear contenido de la celda"""
-        self.supCas = SUP_NORMAL
-        if self.jugador == 1:
+        # Coeficiente de superioridad actual
+        if self.jugador == 0:
             self.sup = self.supCas
-        elif self.jugador == 2:
+        elif self.jugador == 1:
             self.sup = -self.supCas
         else:
             self.sup = 0
 
+    def construir(self, producto):
+        """Construir una infraestructura en la casilla"""
+        infra = self.infraestructura
+        if infra:
+            if type(infra) is not producto:
+                reproducir_sonido('error')
+            else:
+                infra.mejorar()
+        elif g_jugador.pagar(producto.PRECIO):
+            self.infraestructura = producto(g_jugador)
+
+    def destruir(self):
+        """Destruir la infraestructura de la casilla"""
+        self.infraestructura = None
+
     def raton(self, pos_vec):
         """Detecta si el ratón está sobre la casilla. Aproximamos el hexágono por el círculo inscrito."""
         return pos_vec.distance_squared_to(self.centro) < self.INRADIO ** 2
+    
+    def hay_superioridad(self):
+        """Detecta si el jugador actual tiene superioridad aérea en la casilla"""
+        return g_jugador.indice == 0 and self.sup >= self.supCas or g_jugador.indice == 1 and self.sup <= self.supCas
 
+    def hay_supremacia(self):
+        """Detecta si el jugador actual tiene supremacia aérea en la casilla"""
+        return g_jugador.indice == 0 and self.sup >= MULT_SUPREMACIA * self.supCas or g_jugador.indice == 1 and self.sup <= MULT_SUPREMACIA * self.supCas
+    
     def colorear(self):
         """Determinar color"""
-        if self.sup <= -MULTIPLICADOR_SUPREMACIA * self.supCas:
-            self.color = MAPA_COLOR_CASILLA_J2_F
+        if self.sup <= -MULT_SUPREMACIA * self.supCas:
+            self.color = MAPA_COLOR_J2_F
         elif self.sup <= -self.supCas:
-            self.color = MAPA_COLOR_CASILLA_J2
+            self.color = MAPA_COLOR_J2
         elif self.sup < self.supCas:
-            self.color = MAPA_COLOR_CASILLA_NEUTRO
-        elif self.sup < MULTIPLICADOR_SUPREMACIA * self.supCas:
-            self.color = MAPA_COLOR_CASILLA_J1
+            self.color = MAPA_COLOR_NEUTRO
+        elif self.sup < MULT_SUPREMACIA * self.supCas:
+            self.color = MAPA_COLOR_J1
         else:
-            self.color = MAPA_COLOR_CASILLA_J1_F
+            self.color = MAPA_COLOR_J1_F
 
     def dibujar(self, surface):
         """Dibujar casilla en pantalla"""
         pygame.draw.polygon(surface, self.color, self.verts)
+        infra = self.infraestructura
+        if infra:
+            pygame.draw.polygon(surface, infra.COLOR, self.verts, 4)
+            texto(str(infra.nivel), self.centro, 12, infra.COLOR, alineado_h = 'c', alineado_v = 'c', negrita = True, surface = surface)
 
     def seleccionar(self, surface):
         """Destacar visualmente la casilla cuando el raton pasa por encima"""
@@ -448,11 +498,7 @@ class Escenario:
 
         # Array de casillas
         self.casillas = [[Casilla(self, x, y) for y in range(MAPA_DIM_Y)] for x in range(MAPA_DIM_X)]
-        self.semillear()
-
-        # Casillas especiales
-        self.casilla_sobre = None # Casilla actualmente seleccionada con el raton
-        self.casilla_pulsa = None # Casilla actualmente pulsada por el raton
+        self.resetear()
 
     def semillear(self):
         """Cambiar la seleccion de celdas aleatorias que tienen supremacia inicial (OJO: resetea las celdas!)"""
@@ -463,10 +509,10 @@ class Escenario:
 
         # Generar nuevas casillas aleatorias con supremacia
         supremacia = int(MAPA_DIM_J * MAPA_DIM_Y * SUP_INICIAL)
-        for jugador in range(1, 3):
+        for jugador in range(2):
             casillas = [c for col in self.casillas for c in col if c.jugador == jugador]
             for casilla in random.sample(casillas, supremacia):
-                casilla.sup *= MULTIPLICADOR_SUPREMACIA
+                casilla.sup *= MULT_SUPREMACIA
                 casilla.colorear()
 
         # Reajustar los colores de las casillas
@@ -479,6 +525,10 @@ class Escenario:
         pos_vec = pygame.Vector2(g_raton)
         sobre_antes = self.casilla_sobre
         self.casilla_sobre = None
+
+        # Si se clicka en el panel, se deselecciona la casilla
+        if self.panel.raton() and g_click:
+            self.casilla_pulsa = None
 
         # Aproximar la casilla en la que estamos, para evitar testearlas todas
         d = (pos_vec - self.ORIGEN).elementwise() / Casilla.DIM
@@ -511,6 +561,15 @@ class Escenario:
         if self.casilla_pulsa:
             self.casilla_pulsa.pulsar(self.panel.surface)
 
+    def resetear(self):
+        """Resetear los contenidos de todas las celdas"""
+        for col in self.casillas:
+            for casilla in col:
+                casilla.resetear()
+        self.semillear()
+        self.casilla_sobre = None # Casilla actualmente seleccionada con el raton
+        self.casilla_pulsa = None # Casilla actualmente pulsada por el raton
+
 class Informacion:
     """Representa el panel informativo"""
     def __init__(self, panel):
@@ -518,8 +577,9 @@ class Informacion:
         self.texto = None
         x, y, w, h = self.panel.rect
         self.botones = [
-            Boton((0, 0), texto="Semilla", accion=g_escenario.semillear),
-            Boton((0, 0), texto="Reglas",  accion=g_reglas.mostrar)
+            Boton((0, 0), texto="Reglas",    accion=g_reglas.mostrar),
+            Boton((0, 0), texto="Reiniciar", accion=resetear),
+            Boton((0, 0), texto="Salir",     accion=salir)
         ]
         for i, b in enumerate(reversed(self.botones)):
             b.mover(x + w - b.dim[0], y + h - (i + 1) * b.dim[1])
@@ -545,6 +605,11 @@ class Informacion:
             texto_multilinea(self.texto, (x + 10, y + 30), 14, mono = True, max_ancho = w)
         for boton in self.botones:
             boton.dibujar()
+
+    def resetear(self):
+        """Reiniciar los contenidos del panel informativo"""
+        for boton in self.botones:
+            boton.resetear()
 
 class Reglamento:
     """Representa el conjunto de reglas, para el pantallazo inicial"""
@@ -643,18 +708,20 @@ class Reglamento:
         -(Jx) obtenga Sup.A en todas las bases del adversario. Gana Jx.
         -Se acabe el número de rondas establecido previamente por los jugadores. Gana el jugador que sume más puntos de coeficiente de Sup.A.
     """
-    LINEAS_POR_PAGINA = 20 # Numero de lineas por pagina de reglas
-    TAMANO_FUENTE     = 16 # Tamaño de fuente del resto de texto
-    TAMANO_TITULO     = 72 # Tamaño de fuente del titulo
-    TAMANO_BOTONES    = 36 # Tamaño de fuente de los botones
-    MARGEN_EXTERNO    = 20 # Margen entre el panel y la pantalla
-    MARGEN_INTERNO    = 30 # Margen entre el panel y el texto
+    LINEAS_POR_PAGINA = 20        # Numero de lineas por pagina de reglas
+    TAMANO_FUENTE     = 16        # Tamaño de fuente del resto de texto
+    TAMANO_TITULO     = 72        # Tamaño de fuente del titulo
+    TAMANO_BOTONES    = 36        # Tamaño de fuente de los botones
+    MARGEN_EXTERNO    = 20        # Margen entre el panel y la pantalla
+    MARGEN_INTERNO    = 30        # Margen entre el panel y el texto
+    COLOR_FONDO       = "#E5E4E2" # Color de fondo del panel del pantallazo reglas
+    COLOR_TEXTO       = '#000000' # Color de fondo del panel del pantallazo reglas
 
     def __init__(self):
         # Crear superficie auxiliar con todo el contenido, para evitar re-renderizar cada fotograma
         dim = (ANCHURA - 2 * self.MARGEN_EXTERNO, ALTURA - 2 * self.MARGEN_EXTERNO)
         self.surface = pygame.Surface(dim, pygame.SRCALPHA)
-        self.panel = Panel((0,0), dim, radio=20, color=PANTALLAZO_REGLAS_COLOR_FONDO, surface=self.surface)
+        self.panel = Panel((0,0), dim, radio=20, color=self.COLOR_FONDO, surface=self.surface)
         x = (g_pantalla.get_width() - self.surface.get_width()) / 2
         y = (g_pantalla.get_height() - self.surface.get_height()) / 2
         self.origen = (x, y)
@@ -688,9 +755,9 @@ class Reglamento:
         """Renderizar el contenido del reglamento. Hay que llamarlo cada vez que cambie (e.g. al paginar)."""
         x, y, w, h = self.panel.rect
         self.panel.dibujar()
-        texto('REGLAS', (x + ANCHURA / 2, y), color=PANTALLAZO_REGLAS_COLOR_TEXTO, tamaño=self.TAMANO_TITULO, alineado='c', surface=self.surface)
+        texto('REGLAS', (x + ANCHURA / 2, y), color=self.COLOR_TEXTO, tamaño=self.TAMANO_TITULO, alineado_h='c', surface=self.surface)
         texto_multilinea(
-            Reglamento.REGLAS, (x + self.MARGEN_INTERNO, y + self.TAMANO_TITULO + 10), color=PANTALLAZO_REGLAS_COLOR_TEXTO, tamaño=self.TAMANO_FUENTE,
+            Reglamento.REGLAS, (x + self.MARGEN_INTERNO, y + self.TAMANO_TITULO + 10), color=self.COLOR_TEXTO, tamaño=self.TAMANO_FUENTE,
             max_ancho=w-2*self.MARGEN_INTERNO, max_alto=self.LINEAS_POR_PAGINA, surface=self.surface, pagina=self.pagina
         )
         for boton in self.botones:
@@ -744,40 +811,73 @@ class Jugador:
     jugadores = 0
 
     def __init__(self):
-        self.indice     = self.jugadores
-        self.inventario = { producto: 0 for producto in g_productos }
-        self.credito    = CREDITO_INICIAL
+        self.indice = self.jugadores
         self.jugadores += 1
+        self.resetear()
+
+    def resetear(self):
+        """Reiniciar el estado del jugador"""
+        self.inventario = { producto: 0 for producto in Tienda.MEDIOS }
+        self.credito    = CREDITO_INICIAL
 
     def comprar(self, medio):
-        """Adquirir un producto y añadirlo al inventario, si hay credito suficiente"""
-        if self.credito < medio.PRECIO:
-            reproducir_sonido('error')
+        """Adquirir un producto y añadirlo al inventario"""
+        if not self.pagar(medio.PRECIO):
             return
-        reproducir_sonido('dinero')
-        self.inventario[medio] += 1
-        g_tienda.botones[medio].indice = self.inventario[medio]
-        self.credito -= medio.PRECIO
+        if medio in self.inventario:
+            self.inventario[medio] += 1
+            g_tienda.botones[medio].indice = self.inventario[medio]
+    
+    def pagar(self, cantidad):
+        """Desembolsar una cierta cantidad, si hay crédito disponible"""
+        if self.credito < cantidad:
+            reproducir_sonido('error')
+            return False
+        reproducir_sonido('pagar')
+        self.credito -= cantidad
+        return True
+
+    def cobrar(self, cantidad):
+        """Obtener una cierta cantidad de crédito"""
+        self.credito += cantidad
+        reproducir_sonido('cobrar')
 
 class Tienda:
     """Contiene todos los productos que se pueden adquirir y se encarga de su funcionalidad y renderizado"""
     BOTON_SEP = 5
     TAM_FUENTE = 24
+    MEDIOS = [AvionCaza, AvionAtaque, AvionTransporte, Helicoptero, Dron, Radar, Bateria, Inteligencia]
+    INFRAESTRUCTURAS = [Ciudad, Base]
 
     def __init__(self, panel):
         self.panel = panel
 
-        # Crear los botones
-        linea = g_fuentes[self.TAM_FUENTE].get_linesize()
+        # Crear los botones de medios
         self.botones = {}
         cols = 2
+        linea = g_fuentes[self.TAM_FUENTE].get_linesize()
         x = ANCHURA * ANCHURA_JUEGO + 20
         y = 2 * (PANEL_SEPARACION + linea)
-        for i, producto in enumerate(g_productos):
-            self.botones[producto] = Boton((x, y), imagen=producto.ICONO, ayuda=producto.ayuda(), info=producto.info(), indice=0, accion=lambda p: g_jugador.comprar(p), args=(producto,), audio_pul=None)
-            dx, dy = self.botones[producto].dim
+        for i, producto in enumerate(self.MEDIOS + self.INFRAESTRUCTURAS):
+            boton = self.crear_boton(producto)
+            self.botones[producto] = boton
+            boton.mover(x, y)
+            dx, dy = boton.dim
             x += dx + self.BOTON_SEP if i % cols  < cols - 1 else -(dx + self.BOTON_SEP) * (cols - 1)
             y += dy + self.BOTON_SEP if i % cols == cols - 1 else 0
+
+    def crear_boton(self, producto):
+        """Crear cada uno de los botones de la tienda"""
+        accion = None
+        args = ()
+        if producto in self.MEDIOS:
+            accion = lambda p: g_jugador.comprar(p)
+            args = (producto,)
+        elif producto is Ciudad:
+            accion = lambda: g_escenario.casilla_pulsa.construir(Ciudad)
+        elif producto is Base:
+            accion = lambda: g_escenario.casilla_pulsa.construir(Base)
+        return Boton((0, 0), imagen=producto.ICONO, ayuda=f"{producto.NOMBRE} ({producto.PRECIO}M)", info=producto.info(), indice=0, accion=accion, args=args, audio_pul=None)
 
     def actualizar(self):
         """Actualizar estado del contenido de la tienda"""
@@ -788,10 +888,19 @@ class Tienda:
         """Renderizar la tienda en pantalla"""
         self.panel.dibujar()
         linea = g_fuentes[self.TAM_FUENTE].get_linesize()
-        texto(f"Crédito: {g_jugador.credito}M", (ANCHURA * ANCHURA_JUEGO + PANEL_SEPARACION, PANEL_SEPARACION), self.TAM_FUENTE)
-        texto('Tienda', (ANCHURA * (ANCHURA_JUEGO + 1) / 2, PANEL_SEPARACION + linea), self.TAM_FUENTE, alineado = 'c', subrayado = True)
-        for boton in self.botones.values():
-            boton.dibujar()
+        texto(f"Crédito: {g_jugador.credito}M", (ANCHURA * ANCHURA_JUEGO + PANEL_SEPARACION, PANEL_SEPARACION), tamaño=self.TAM_FUENTE)
+        texto('Tienda', (ANCHURA * (ANCHURA_JUEGO + 1) / 2, PANEL_SEPARACION + linea), tamaño=self.TAM_FUENTE, alineado_h='c', subrayado=True)
+        for medio in self.MEDIOS:
+            self.botones[medio].dibujar()
+        if g_escenario.casilla_pulsa and g_escenario.casilla_pulsa.hay_supremacia():
+            for medio in self.INFRAESTRUCTURAS:
+                self.botones[medio].dibujar()
+
+    def resetear(self):
+        """Reiniciar el contenido de la tienda"""
+        for producto, boton in self.botones.items():
+            boton.resetear()
+            boton.ayuda = f"{producto.NOMBRE} ({producto.PRECIO}M)"
 
 # < -------------------------------------------------------------------------- >
 #                             CLASES DE LA INTERFAZ
@@ -841,7 +950,7 @@ class Panel:
 
         # Nombre
         if self.nombre:
-            texto(self.nombre.capitalize(), (self.pos[0] + self.dim[0] / 2, self.pos[1]), 24, alineado = 'c', subrayado = True, surface = self.surface)
+            texto(self.nombre.capitalize(), (self.pos[0] + self.dim[0] / 2, self.pos[1]), tamaño = 24, alineado_h = 'c', subrayado = True, surface = self.surface)
 
     def raton(self):
         """Devuelve si el raton está sobre el panel"""
@@ -878,12 +987,10 @@ class Boton:
         x, y = self.imagen.get_size()
         self.dim = (x + 5, y + 5) # Dimensiones del botón
 
-        # Logica
-        self.selec = False        # Verdadero si el ratón está encima del botón
-        self.pulsado = False      # Verdadero si el botón está siendo pulsado
-
         # Otros elementos
         self.panel = Panel(self.pos, self.dim, None, BOTON_COLOR_NORMAL, surface=self.surface, origen=origen)
+
+        self.resetear()
 
     def mover(self, dx, dy):
         """Cambiar la posicion del boton"""
@@ -919,7 +1026,7 @@ class Boton:
             g_ayuda = self.ayuda
 
         # Ejecutar acción si está pulsado
-        if self.pulsado:
+        if self.pulsado and self.accion:
             self.accion(*self.args)
 
         # Devolver si ha habido cambio de estado
@@ -935,7 +1042,14 @@ class Boton:
         fuente = g_fuentes[AYUDA_TAMANO]
         w1, h1 = self.dim
         w2, h2 = fuente.size(str(self.indice))
-        texto(str(self.indice), (x + w1 - 2, y + h1 - h2), AYUDA_TAMANO, (0, 0, 0), 'd', surface=self.surface)
+        texto(str(self.indice), (x + w1 - 2, y + h1 - h2), tamaño = AYUDA_TAMANO, color = "#ff0000", alineado_h = 'd', surface = self.surface)
+
+    def resetear(self):
+        """Reiniciar los valores del botón <<a fábica>>"""
+        self.selec   = False # Verdadero si el ratón está encima del botón
+        self.pulsado = False # Verdadero si el botón está siendo pulsado
+        if self.indice:
+            self.indice = 0
 
 class Fase(enum.IntEnum):
     """Representa cada posible fase del juego"""
@@ -966,16 +1080,17 @@ def ayuda():
     texto(g_ayuda, pos, AYUDA_TAMANO)
 
 def texto(
-        cadena,
-        posicion,
-        tamaño    = TEXTO_TAMANO,
-        color     = COLOR_TEXTO,
-        alineado  = 'i',
-        negrita   = False,
-        cursiva   = False,
-        subrayado = False,
-        mono      = False,
-        surface   = g_pantalla
+        cadena,                    # Cadena de texto a renderizar
+        posicion,                  # Posicion del texo con respecto a la superficie
+        tamaño     = TEXTO_TAMANO, # Tamaño de la fuente en píxeles
+        color      = COLOR_TEXTO,  # Color del texto (hex, tripla de ints...)
+        alineado_h = 'i',          # Alineacion [i(zquierda), c(entro), d(erecha)]
+        alineado_v = 'a',          # Alineacion [a(rriba), c(entro), b(ase)]
+        negrita    = False,
+        cursiva    = False,
+        subrayado  = False,
+        mono       = False,        # Usar fuente monoespaciada
+        surface    = g_pantalla    # Superficie donde renderizar texto
     ):
     """Escribir un texto en la pantalla"""
     # Aseguramos que el tamaño de fuente deseado esta disponible
@@ -984,9 +1099,13 @@ def texto(
 
     # Ajustamos la posicion para respetar el alineado
     fuente = g_fuentes_mono[tamaño] if mono else g_fuentes[tamaño]
-    longitud = fuente.size(cadena)[0]
-    x = posicion[0] - (longitud if alineado == 'd' else longitud / 2 if alineado == 'c' else 0)
-    y = posicion[1]
+    dx, dy = fuente.size(cadena)
+    if type(posicion) is pygame.math.Vector2:
+        x, y = posicion.x, posicion.y
+    else:
+        x, y = posicion
+    x -= (dx if alineado_h == 'd' else dx / 2 if alineado_h == 'c' else 0)
+    y -= (dy if alineado_v == 'b' else dy / 2 if alineado_v == 'c' else 0)
 
     # Configuramos y renderizamos el texto
     subrayado_original = fuente.underline
@@ -1032,17 +1151,18 @@ def dividir_texto(texto, fuente, max_ancho):
 def texto_multilinea(
         cadena,
         posicion,
-        tamaño    = TEXTO_TAMANO,
-        color     = COLOR_TEXTO,
-        alineado  = 'i',
-        negrita   = False,
-        cursiva   = False,
-        subrayado = False,
-        mono      = False,
-        surface   = g_pantalla,
-        pagina    = 0,
-        max_ancho = 200,
-        max_alto  = 20
+        tamaño     = TEXTO_TAMANO,
+        color      = COLOR_TEXTO,
+        alineado_h = 'i',
+        alineado_v = 'a',
+        negrita    = False,
+        cursiva    = False,
+        subrayado  = False,
+        mono       = False,
+        surface    = g_pantalla,
+        pagina     = 0,
+        max_ancho  = 200,
+        max_alto   = 20
     ):
     """
     Permite dividir el texto, producir saltos de línea y tabulaciones
@@ -1056,7 +1176,7 @@ def texto_multilinea(
     paginas = math.ceil(len(lineas) / max_alto)
     pagina = entre(pagina, 0, paginas - 1)
     for linea in lineas[max_alto * pagina : max_alto * (pagina + 1)]:
-        texto(linea, (x, y), tamaño, color, alineado, negrita, cursiva, subrayado, mono, surface)
+        texto(linea, (x, y), tamaño, color, alineado_h, alineado_v, negrita, cursiva, subrayado, mono, surface)
         y += fuente.get_linesize()
     return pagina < paginas - 1
 
@@ -1131,12 +1251,25 @@ def actualizar_fase_turnos():
     if g_reglas.visible:
         actualizar_fase_reglas()
 
+def resetear():
+    global g_fase
+    g_reglas.resetear()
+    g_escenario.resetear()
+    g_tienda.resetear()
+    g_info.resetear()
+    for jugador in g_jugadores:
+        jugador.resetear()
+    g_fase = Fase.TURNOS
+
+def salir():
+    pygame.event.post(pygame.event.Event(pygame.QUIT))
 # < -------------------------------------------------------------------------- >
 #                           INICIALIZACIÓN DEL JUEGO
 # < -------------------------------------------------------------------------- >
 
 # Comenzar musica
 if MUSICA_REPRODUCIR:
+    pygame.mixer.music.set_volume(MUSICA_VOLUMEN)
     pygame.mixer.music.play(-1)
 
 # Configurar paneles
@@ -1148,7 +1281,6 @@ paneles = {
 }
 
 # Inicializar algunas variables globales
-g_productos = [AvionCaza, AvionAtaque, AvionTransporte, Helicoptero, Dron, Radar, Bateria, Inteligencia, Infraestructura]
 g_reglas    = Reglamento()                          # Paginador de reglas
 g_escenario = Escenario(paneles['escenario'])     # Casillas del mapa y su contenido
 g_tienda    = Tienda(paneles['tienda'])           # Tienda de productos
