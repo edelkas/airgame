@@ -131,11 +131,6 @@ COEF_SUP        = 20  # Coeficiente de sup aerea en una casilla normal
 SUP_INICIAL     = 0.1 # Proporción de casillas iniciales con supremacia (aleatorias)
 MULT_SUPREMACIA = 2   # Ratio entre superioridad y supremacia aerea
 
-# Reglas
-CANTIDAD_CAPITAL = 1 # Cantidad inicial de capitales
-CANTIDAD_CIUDAD  = 2 # Cantidad inicial de ciudades normales
-CANTIDAD_BASE    = 3 # Cantidad inicial de bases aéreas
-
 # Recuadros de ayuda e informacion
 AYUDA_COLOR = (255, 255, 192) # Color del fondo
 AYUDA_TAMANO = 16             # Tamaño de la letra
@@ -424,7 +419,8 @@ class Infraestructura(MedioEstrategico):
 
     def cosechar(self):
         """Obtener el bonus económico que otorga la infraestructura"""
-        self.jugador.cobrar(self.BONUS)
+        self.jugador.cobrar(self.BONUS * self.nivel)
+        return self.BONUS > 0
 
 class Ciudad(Infraestructura):
     """Infraestructura que otorga recursos al jugador"""
@@ -435,6 +431,7 @@ class Ciudad(Infraestructura):
     PRECIO_MEJORA = 100
     SUP           = 40
     BONUS         = 10
+    CANTIDAD      = 2
     COLOR         = "#000000"
 
 class Base(Infraestructura):
@@ -445,6 +442,7 @@ class Base(Infraestructura):
     PRECIO        = 300
     PRECIO_MEJORA = 150
     SUP           = 60
+    CANTIDAD      = 3
     COLOR         = "#00b050"
 
 class Capital(Ciudad):
@@ -453,6 +451,7 @@ class Capital(Ciudad):
     PRECIO        = 500
     PRECIO_MEJORA = 250
     SUP           = 100
+    CANTIDAD      = 1
     COLOR         = "#c09200"
 
 class Casilla:
@@ -463,6 +462,8 @@ class Casilla:
     DIM_X   = RADIO * 3 ** 0.5
     DIM_Y   = RADIO * 1.5
     DIM     = pygame.math.Vector2(DIM_X, DIM_Y)
+    BONUS   = 1 # Crédito otorgado al jugador con superioridad aérea en la casilla por turno
+    BONUS_F = 2 # Ídem, pero con supremacía aérea
 
     def __init__(self, esc, x, y):
         self.x = x
@@ -504,6 +505,16 @@ class Casilla:
             self.sup = self.supCas
         else:
             self.sup = -self.supCas
+
+    def cosechar(self):
+        """Otorgar bonus de crédito al jugador"""
+        if self.hay_supremacia():
+            self.jugador.cobrar(self.BONUS_F)
+            return True
+        elif self.hay_superioridad():
+            self.jugador.cobrar(self.BONUS)
+            return True
+        return False
 
     def destruir(self):
         """Destruir la infraestructura de la casilla"""
@@ -678,6 +689,14 @@ class Escenario:
         # Panel de ayuda al sobrevolar una celda
         if self.casilla_sobre:
             self.casilla_sobre.ayuda()
+
+    def cosechar(self):
+        """Adquirir crédito adicional debido a las casillas con superioridad aérea"""
+        cosechado = False
+        for columna in self.casillas:
+            for casilla in columna:
+                cosechado = cosechado or casilla.cosechar()
+        return cosechado
 
     def resetear(self):
         """Resetear los contenidos de todas las celdas"""
@@ -962,11 +981,11 @@ class Jugador:
         else:                               # No hay infraestructura -> Construir
             if g_fase == 'Preparación':
                 cantidad = sum(1 for infra in self.infraestructuras if type(infra) is producto)
-                limite = { Ciudad: CANTIDAD_CIUDAD, Base: CANTIDAD_BASE, Capital: CANTIDAD_CAPITAL }[producto]
-                if cantidad >= limite:
+                if cantidad >= producto.CANTIDAD:
                     reproducir_sonido('error', 'interfaz')
                     return
-            elif not self.pagar(producto.PRECIO):                    return
+            elif not self.pagar(producto.PRECIO):
+                return
             infra = producto(self, casilla)
             casilla.infraestructura = infra
             self.infraestructuras.append(infra)
@@ -984,7 +1003,14 @@ class Jugador:
     def cobrar(self, cantidad):
         """Obtener una cierta cantidad de crédito"""
         self.credito += cantidad
-        reproducir_sonido('cobrar', 'efectos')
+
+    def cosechar(self):
+        """Adquirir crédito adicional debido a la superioridad aérea y las infraestructuras"""
+        cosechado = g_escenario.cosechar()
+        for infra in self.infraestructuras:
+            cosechado = cosechado or infra.cosechar()
+        if cosechado:
+            reproducir_sonido('cobrar', 'efectos')
 
 class Tienda:
     """Contiene todos los productos que se pueden adquirir y se encarga de su funcionalidad y renderizado"""
@@ -1450,6 +1476,27 @@ def resetear_fase():
     """Volver a la primera fase del juego"""
     cambiar_fase('Preparación')
 
+def siguiente_paso():
+    """Avanzar al siguiente paso del turno"""
+    global g_paso
+    indice = g_pasos.index(g_paso)
+    if indice < len(g_pasos) - 1:
+        g_paso = g_pasos[indice + 1]
+    else:
+        resetear_paso()
+
+def cambiar_paso(nombre):
+    """Cambiar a otro paso del turno"""
+    global g_paso
+    if nombre in g_pasos:
+        g_paso = nombre
+        return True
+    return False
+
+def resetear_paso():
+    """Volver al primer paso del turno"""
+    cambiar_paso('Reporte')
+
 def actualizar_variables():
     """Actualizacion de variables en cada fotograma"""
     global g_ayuda, g_raton
@@ -1469,7 +1516,7 @@ def actualizar_fase_reglas():
     g_reglas.actualizar()
     g_reglas.dibujar()
 
-def actualizar_fase_turnos():
+def actualizar_fase_principal():
     """Actualizar estado en la fase de turnos"""
     visible = not g_reglas.visible
 
@@ -1489,6 +1536,49 @@ def actualizar_fase_turnos():
         ayuda()
     if g_reglas.visible:
         actualizar_fase_reglas()
+
+    # Actualizar paso específico del turno g_pasos = ['Reporte', 'Inteligencia', 'Ingresos', 'Recursos', 'Ataque', 'Despliegue']
+    if g_paso == 'Reporte':
+        actualizar_paso_reporte()
+    elif g_paso == 'Inteligencia':
+        actualizar_paso_inteligencia()
+    elif g_paso == 'Ingresos':
+        actualizar_paso_ingresos()
+    elif g_paso == 'Recursos':
+        actualizar_paso_recursos()
+    elif g_paso == 'Ataque':
+        actualizar_paso_ataque()
+    elif g_paso == 'Despliegue':
+        actualizar_paso_despliegue()
+
+def actualizar_paso_reporte():
+    """Desarrollar el paso de reporte. El jugador recibe un reporte
+    informativo del movimiento del adversario."""
+    pass
+
+def actualizar_paso_inteligencia():
+    """Desarrollar el paso de inteligencia. El jugador recibe información adicional
+    en función del nivel de inteligencia que haya adquirido."""
+    pass
+
+def actualizar_paso_ingresos():
+    """Desarrollar el paso de ingresos. El jugador cosecha crédito adicional gracias
+    a las casillas en las que tenga superioridad / supremacia aérea, así como sus ciudades."""
+    g_jugador.cosechar()
+
+def actualizar_paso_recursos():
+    """Desarrollar el paso de recursos. El jugador invierte crédito en adquirir medios
+    aéreos, antiaéreos o estratégicos - como inteligencia o infraestructuras."""
+    pass
+
+def actualizar_paso_ataque():
+    """Desarrollar el paso de ataque. Las aeronaves desplegadas podrán atacar
+    casillas enemigas, destruyendo sus medios si los ataques son certeros."""
+    pass
+
+def actualizar_paso_despliegue():
+    """Desarrollar el paso de despliegue. El jugador moviliza aeronaves en alguna casilla."""
+    pass
 
 def resetear():
     g_reglas.resetear()
@@ -1526,9 +1616,11 @@ g_escenario = Escenario(paneles['escenario'])       # Casillas del mapa y su con
 g_tienda    = Tienda(paneles['tienda'])             # Tienda de productos
 g_info      = Informacion(paneles['informacion'])   # Panel informativo inferior
 
-# Fases del juego
-g_fases = ['Pantallazo', 'Reglas', 'Preparación', 'Turnos', 'Final']
+# Fases y pasos del juego. Los pasos son las distintas etapas en las que se divide un turno.
+g_fases = ['Pantallazo', 'Reglas', 'Preparación', 'Principal', 'Final']
 g_fase = g_fases[0]
+g_pasos = ['Reporte', 'Inteligencia', 'Ingresos', 'Recursos', 'Ataque', 'Despliegue']
+g_paso = g_pasos[0]
 
 # Configuracion
 g_config = {
@@ -1568,8 +1660,8 @@ while True:
         actualizar_fase_reglas()
         if not g_reglas.visible:
             siguiente_fase()
-    elif g_fase in ['Preparación', 'Turnos']:         # Fase central del juego
-        actualizar_fase_turnos()
+    elif g_fase in ['Preparación', 'Principal']:         # Fase central del juego
+        actualizar_fase_principal()
     else:
         pass
 
