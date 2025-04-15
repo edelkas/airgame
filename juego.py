@@ -91,13 +91,16 @@ BOTON_TAMANO_LETRA = 16        # Tamaño de la letra
 IMAGEN_FONDO       = "imagenairgame.jpg"
 MUSICA_FONDO       = "topgunmusic.ogg"
 
-SONIDO_PAGAR       = "cajaregistradora.ogg"
-SONIDO_COBRAR      = "monedas.ogg"
-SONIDO_ERROR       = "error.ogg"
-SONIDO_BOTON_SEL   = 'click.ogg'
-SONIDO_BOTON_PUL   = 'switch.ogg'
-SONIDO_CASILLA_SEL = 'glass.ogg'
-SONIDO_CASILLA_PUL = 'casilla.ogg'
+SONIDO_PAGAR         = 'cajaregistradora.ogg'
+SONIDO_COBRAR        = 'monedas.ogg'
+SONIDO_ERROR         = 'error.ogg'
+SONIDO_BOTON_SEL     = 'click.ogg'
+SONIDO_BOTON_PUL     = 'switch.ogg'
+SONIDO_CASILLA_SEL   = 'glass.ogg'
+SONIDO_CASILLA_PUL   = 'casilla.ogg'
+SONIDO_PAGINA        = 'pagina.ogg'
+SONIDO_PUERTA_ABRE   = 'puerta_abre.ogg'
+SONIDO_PUERTA_CIERRA = 'puerta_cierra.ogg'
 
 TEXTURA_ESCENARIO  = 'textura_hierba.png'
 TEXTURA_TIENDA     = 'textura_ladrillos.png'
@@ -206,13 +209,16 @@ g_iconos = {
     'Base':            cargar_imagen('icono_base.png')
 }
 g_sonidos = {
-    'pagar':       cargar_sonido(SONIDO_PAGAR),
-    'cobrar':      cargar_sonido(SONIDO_COBRAR),
-    'error':       cargar_sonido(SONIDO_ERROR),
-    'boton_sel':   cargar_sonido(SONIDO_BOTON_SEL),
-    'boton_pul':   cargar_sonido(SONIDO_BOTON_PUL),
-    'casilla_sel': cargar_sonido(SONIDO_CASILLA_SEL),
-    'casilla_pul': cargar_sonido(SONIDO_CASILLA_PUL)
+    'pagar':         cargar_sonido(SONIDO_PAGAR),
+    'cobrar':        cargar_sonido(SONIDO_COBRAR),
+    'error':         cargar_sonido(SONIDO_ERROR),
+    'boton_sel':     cargar_sonido(SONIDO_BOTON_SEL),
+    'boton_pul':     cargar_sonido(SONIDO_BOTON_PUL),
+    'casilla_sel':   cargar_sonido(SONIDO_CASILLA_SEL),
+    'casilla_pul':   cargar_sonido(SONIDO_CASILLA_PUL),
+    'pagina':        cargar_sonido(SONIDO_PAGINA),
+    'puerta_abre':   cargar_sonido(SONIDO_PUERTA_ABRE),
+    'puerta_cierra': cargar_sonido(SONIDO_PUERTA_CIERRA)
 }
 g_texturas = {
     'hierba':    cargar_textura(TEXTURA_ESCENARIO, TEXTURA_ESCENARIO_COLOR),
@@ -501,7 +507,7 @@ class Casilla:
 
     def hay_supremacia(self):
         """Detecta si el jugador actual tiene supremacia aérea en la casilla"""
-        return g_jugador.indice == 0 and self.sup >= MULT_SUPREMACIA * self.supCas or g_jugador.indice == 1 and self.sup <= MULT_SUPREMACIA * self.supCas
+        return g_jugador.indice == 0 and self.sup >= MULT_SUPREMACIA * self.supCas or g_jugador.indice == 1 and self.sup <= -MULT_SUPREMACIA * self.supCas
 
     def colorear(self):
         """Determinar color"""
@@ -660,7 +666,7 @@ class Informacion:
         self.botones = [
             Boton((0, 0), texto="Jugar",     anchura=80, accion=siguiente_jugador),
             Boton((0, 0), texto="Música",    anchura=80, accion=cambiar_musica),
-            Boton((0, 0), texto="Reglas",    anchura=80, accion=g_reglas.mostrar),
+            Boton((0, 0), texto="Reglas",    anchura=80, accion=g_reglas.mostrar, audio_pul='puerta_abre'),
             Boton((0, 0), texto="Reiniciar", anchura=80, accion=resetear),
             Boton((0, 0), texto="Salir",     anchura=80, accion=salir)
         ]
@@ -823,7 +829,7 @@ class Reglamento:
         self.botones = [
             Boton((0, dy), texto='Anterior',  tamaño=self.TAMANO_BOTONES, accion=self.pagina_anterior,  surface=self.panel.lienzo, origen=(x,y)),
             Boton((0, dy), texto='Siguiente', tamaño=self.TAMANO_BOTONES, accion=self.pagina_siguiente, surface=self.panel.lienzo, origen=(x,y)),
-            Boton((0, dy), texto='Salir',     tamaño=self.TAMANO_BOTONES, accion=self.resetear,         surface=self.panel.lienzo, origen=(x,y))
+            Boton((0, dy), texto='Salir',     tamaño=self.TAMANO_BOTONES, accion=self.resetear,         surface=self.panel.lienzo, origen=(x,y), audio_pul='puerta_cierra')
         ]
         anchura = sum(boton.dim[0] for boton in self.botones) + 10 * (len(self.botones) - 1)
         diff = 0
@@ -916,11 +922,21 @@ class Jugador:
         """Construir o mejorar una infraestructura en el mapa"""
         infra = casilla.infraestructura
         if infra:
-            if type(infra) is not producto:
+            if type(infra) is not producto: # Infraestructura de otro tipo -> Error
                 reproducir_sonido('error')
-            else:
+            elif g_fase != 'Preparación':   # Infraestructura del mismo tipo -> Mejorar
                 infra.mejorar()
-        elif self.pagar(producto.PRECIO):
+            else:                           # No se puede mejorar en fase de preparación
+                reproducir_sonido('error')
+        else:                               # No hay infraestructura -> Construir
+            if g_fase == 'Preparación':
+                cantidad = sum(1 for infra in self.infraestructuras if type(infra) is producto)
+                limite = { Ciudad: CANTIDAD_CIUDAD, Base: CANTIDAD_BASE, Capital: CANTIDAD_CAPITAL }[producto]
+                if cantidad >= limite:
+                    reproducir_sonido('error')
+                    return
+            elif not self.pagar(producto.PRECIO):
+                    return
             infra = producto(self, casilla)
             casilla.infraestructura = infra
             self.infraestructuras.append(infra)
@@ -986,7 +1002,7 @@ class Tienda:
                 boton.bloquear()
             else:
                 boton.desbloquear()
-            boton.indice = sum(1 for producto in g_jugador.medios if type(producto) is medio)
+            boton.indexar(sum(1 for producto in g_jugador.medios if type(producto) is medio))
             boton.actualizar()
 
         # Actualizar botones de infraestructuras
@@ -999,7 +1015,7 @@ class Tienda:
                 boton.ayuda = f"Mejorar {infra.NOMBRE} ({infra.PRECIO_MEJORA}M)"
             else:
                 boton.ayuda = f"{infra.NOMBRE} ({infra.PRECIO}M)"
-            boton.indice = sum(1 for producto in g_jugador.infraestructuras if type(producto) is infra)
+            boton.indexar(sum(1 for producto in g_jugador.infraestructuras if type(producto) is infra))
             boton.actualizar()
 
     def dibujar(self):
@@ -1155,6 +1171,12 @@ class Boton:
     def ocultar(self):
         """Hacer el botón invisible (y, por ende, desactivado)"""
         self.visible = False
+
+    def indexar(self, indice):
+        """Cambiar el índice del botón"""
+        if self.indice != indice:
+            self.indice = indice
+            self.renderizar()
 
     def actualizar(self):
         """Actualizar estado y propiedades del boton"""
