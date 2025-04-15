@@ -969,7 +969,11 @@ class Tienda:
                 self.botones[infra].ayuda = f"{infra.NOMBRE} ({infra.PRECIO}M)"
 
         # Actualizar todos los botones de la tienda
-        for boton in self.botones.values():
+        for producto, boton in self.botones.items():
+            if producto in self.MEDIOS and g_fase == 'Preparación':
+                boton.bloquear()
+            else:
+                boton.desbloquear()
             boton.actualizar()
 
     def dibujar(self):
@@ -1062,24 +1066,25 @@ class Boton:
     def __init__(
             self, pos, origen=(0,0), texto=None, tamaño=BOTON_TAMANO_LETRA, imagen=None, ayuda=None, textura='gotele',
             info=None, indice=None, accion=None, args=(), surface=g_pantalla, audio_sel='boton_sel', audio_pul='boton_pul',
-            anchura=None, altura=None
+            anchura=None, altura=None, bloqueado=False
         ):
         if not texto and not imagen:
             return
-        self.pos       = pos       # Posición del botón en pantalla
-        self.texto     = None      # Texto del boton
-        self.imagen    = None      # Imagen del boton
-        self.ayuda     = ayuda     # Pequeña descripción del botón, para cuando es seleccionado
-        self.info      = info      # Descripción más detallada del botón seleccionado
-        self.accion    = accion    # Función a ejecutar si el botón es pulsado
-        self.args      = args      # Argumentos que mandar a la función acción, si son necesarios
-        self.surface   = surface   # Superficie sobre la que se renderiza en boton
-        self.indice    = indice    # Pequeño número que aparezca en la esquina del botón
-        self.audio_sel = audio_sel # Sonido que se reproduce al seleccionar el boton
-        self.audio_pul = audio_pul # Sonido que se reproduce al pulsar el boton
-        self.textura   = textura   # Textura a usar para el boton
-        self.anchura   = anchura   # Anchura mínima del botón
-        self.altura    = altura    # Altura mínima del botón
+        self.pos        = pos       # Posición del botón en pantalla
+        self.texto      = None      # Texto del boton
+        self.imagen     = None      # Imagen del boton
+        self.ayuda      = ayuda     # Pequeña descripción del botón, para cuando es seleccionado
+        self.info       = info      # Descripción más detallada del botón seleccionado
+        self.accion     = accion    # Función a ejecutar si el botón es pulsado
+        self.args       = args      # Argumentos que mandar a la función acción, si son necesarios
+        self.surface    = surface   # Superficie sobre la que se renderiza en boton
+        self.indice     = indice    # Pequeño número que aparezca en la esquina del botón
+        self.audio_sel  = audio_sel # Sonido que se reproduce al seleccionar el boton
+        self.audio_pul  = audio_pul # Sonido que se reproduce al pulsar el boton
+        self.textura    = textura   # Textura a usar para el boton
+        self.anchura    = anchura   # Anchura mínima del botón
+        self.altura     = altura    # Altura mínima del botón
+        self.block_orig = bloqueado # Un botón bloqueado no puede usarse. Copia del valor original, que puede cambiar.
 
         # Calculamos el tamaño del boton
         if texto:
@@ -1110,13 +1115,21 @@ class Boton:
         self.panel.mover(dx, dy)
         self.pos = (self.pos[0] + dx, self.pos[1] + dy)
 
+    def bloquear(self):
+        """Bloquear el boton para impedir que pueda usarse"""
+        self.block = True
+
+    def desbloquear(self):
+        """Desbloquear el boton para que pueda volver a usarse"""
+        self.block = False
+
     def actualizar(self):
         """Actualizar estado y propiedades del boton"""
         # Modificar estado (seleccionado / pulsado) y detectar cambios
         selec_antes = self.selec
         pulsado_antes = self.pulsado
         self.selec = self.panel.raton()
-        self.pulsado = self.selec and g_click
+        self.pulsado = self.selec and g_click and not self.block
         cambio = selec_antes != self.selec or pulsado_antes != self.pulsado
 
         # Reproducir sonidos
@@ -1124,6 +1137,8 @@ class Boton:
             reproducir_sonido(self.audio_sel)
         if not pulsado_antes and self.pulsado and self.audio_pul:
             reproducir_sonido(self.audio_pul)
+        if self.selec and g_click and self.block:
+            reproducir_sonido('error')
 
         # Actualizar color y renderizar boton
         if self.pulsado:
@@ -1167,6 +1182,7 @@ class Boton:
         """Reiniciar los valores del botón <<a fábica>>"""
         self.selec   = False # Verdadero si el ratón está encima del botón
         self.pulsado = False # Verdadero si el botón está siendo pulsado
+        self.block   = self.block_orig
         if self.indice:
             self.indice = 0
         self.renderizar()
