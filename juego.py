@@ -577,6 +577,17 @@ class Casilla:
         self.pul = False
         g_escenario.casilla_pulsa = None
 
+    def ayuda(self):
+        """Mostrar el recuadro de ayuda al pasar el ratón sobre la casilla"""
+        global g_ayuda
+        g_ayuda = f"{self.supCas} / {abs(self.sup)}"
+        if self.sup != 0:
+            indice = 1 if self.sup > 0 else 2
+            g_ayuda += f" (J{indice})"
+        infra = self.infraestructura
+        if infra:
+            g_ayuda += f"\n{type(infra).__name__} ({infra.nivel})"
+
 class Escenario:
     ORIGEN_X = (ANCHURA * ANCHURA_JUEGO - MAPA_DIM_X * Casilla.DIM_X) / 2
     ORIGEN_Y = ALTURA * ALTURA_JUEGO - MAPA_DIM_Y * Casilla.DIM_Y
@@ -655,11 +666,18 @@ class Escenario:
             self.casilla_pulsa.despulsar()
 
     def dibujar(self):
-        """Dibujar todas las celdas en pantalla"""
+        """Dibujar todo el contenido del escenario en pantalla"""
+        # Panel de fondo
         self.panel.dibujar()
+
+        # Mapa de celdas
         for columna in self.casillas:
             for casilla in columna:
                 casilla.dibujar(self.panel.surface)
+
+        # Panel de ayuda al sobrevolar una celda
+        if self.casilla_sobre:
+            self.casilla_sobre.ayuda()
 
     def resetear(self):
         """Resetear los contenidos de todas las celdas"""
@@ -948,8 +966,7 @@ class Jugador:
                 if cantidad >= limite:
                     reproducir_sonido('error', 'interfaz')
                     return
-            elif not self.pagar(producto.PRECIO):
-                    return
+            elif not self.pagar(producto.PRECIO):                    return
             infra = producto(self, casilla)
             casilla.infraestructura = infra
             self.infraestructuras.append(infra)
@@ -1272,20 +1289,22 @@ def entre(n, a, b):
 
 def ayuda():
     """Muestra un pequeño rectángulo con información de ayuda y las info asociada a cada producto cuando el ratón esta sobre su botón"""
-    x, y = g_raton
-    pos = (x - 80, y + 20)
+    x, y = g_raton[0] - 80, g_raton[1] + 20
+    lineas = g_ayuda.split('\n')
     fuente = g_fuentes[AYUDA_TAMANO]
-    dim = fuente.size(g_ayuda)
-    pygame.draw.rect(g_pantalla, AYUDA_COLOR, pos + dim)
-    texto(g_ayuda, pos, AYUDA_TAMANO)
+    anchura = max(fuente.size(linea)[0] for linea in lineas) + 4
+    altura = fuente.get_linesize() * len(lineas) + 2
+    pygame.draw.rect(g_pantalla, AYUDA_COLOR, (x, y, anchura, altura))
+    pygame.draw.rect(g_pantalla, '#000000', (x, y, anchura, altura), 1)
+    texto_multilinea(g_ayuda, (x + 2, y), AYUDA_TAMANO)
 
 def texto(
         cadena,                    # Cadena de texto a renderizar
         posicion,                  # Posicion del texo con respecto a la superficie
         tamaño     = TEXTO_TAMANO, # Tamaño de la fuente en píxeles
         color      = COLOR_TEXTO,  # Color del texto (hex, tripla de ints...)
-        alineado_h = 'i',          # Alineacion [i(zquierda), c(entro), d(erecha)]
-        alineado_v = 'a',          # Alineacion [a(rriba), c(entro), b(ase)]
+        alineado_h = 'i',          # Alineacion horizontal [i(zquierda), c(entro), d(erecha)]
+        alineado_v = 'a',          # Alineacion vertical [a(rriba), c(entro), b(ase)]
         negrita    = False,
         cursiva    = False,
         subrayado  = False,
@@ -1360,12 +1379,12 @@ def texto_multilinea(
         subrayado  = False,
         mono       = False,
         surface    = g_pantalla,
-        pagina     = 0,
-        max_ancho  = 200,
-        max_alto   = 20
+        pagina     = 0,    # Página del texto a renderizar
+        max_ancho  = 200,  # Anchura máxima en píxeles
+        max_alto   = 20    # Altura máxima en líneas. Determina el número de páginas.
     ):
     """
-    Permite dividir el texto, producir saltos de línea y tabulaciones
+    Renderizar texto en múltiples líneas y páginas
     Devuelve un booleano que indica si faltan paginas por dibujar
     """
     if not tamaño in TEXTO_TAMANOS:
@@ -1429,8 +1448,7 @@ def cambiar_fase(nombre):
 
 def resetear_fase():
     """Volver a la primera fase del juego"""
-    global g_fase
-    g_fase = g_fases[0]
+    cambiar_fase('Preparación')
 
 def actualizar_variables():
     """Actualizacion de variables en cada fotograma"""
