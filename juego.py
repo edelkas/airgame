@@ -101,6 +101,7 @@ SONIDO_CASILLA_PUL   = 'casilla.ogg'
 SONIDO_PAGINA        = 'pagina.ogg'
 SONIDO_PUERTA_ABRE   = 'puerta_abre.ogg'
 SONIDO_PUERTA_CIERRA = 'puerta_cierra.ogg'
+SONIDO_CONSTRUIR     = 'maquina.ogg'
 
 TEXTURA_ESCENARIO  = 'textura_hierba.png'
 TEXTURA_TIENDA     = 'textura_ladrillos.png'
@@ -176,9 +177,11 @@ def cargar_sonido(nombre):
     """Cargar un fichero de audio en PyGame"""
     return pygame.mixer.Sound(os.path.join(CARPETA_AUDIO, nombre))
 
-def reproducir_sonido(nombre):
-    """Reproducir uno de los sonidos cargados"""
-    g_sonidos[nombre].play()
+def reproducir_sonido(nombre, canal = None):
+    """Reproducir uno de los sonidos cargados por el canal especificado"""
+    if not canal:
+        canal = pygame.mixer.find_channel(True)
+    g_canales[canal].play(g_sonidos[nombre])
 
 # Configuramos la pantalla (nombre, dimensiones, fotogramaje, etc)
 flags = 0
@@ -218,7 +221,8 @@ g_sonidos = {
     'casilla_pul':   cargar_sonido(SONIDO_CASILLA_PUL),
     'pagina':        cargar_sonido(SONIDO_PAGINA),
     'puerta_abre':   cargar_sonido(SONIDO_PUERTA_ABRE),
-    'puerta_cierra': cargar_sonido(SONIDO_PUERTA_CIERRA)
+    'puerta_cierra': cargar_sonido(SONIDO_PUERTA_CIERRA),
+    'construir':     cargar_sonido(SONIDO_CONSTRUIR)
 }
 g_texturas = {
     'hierba':    cargar_textura(TEXTURA_ESCENARIO, TEXTURA_ESCENARIO_COLOR),
@@ -226,6 +230,14 @@ g_texturas = {
     'piedras':   cargar_textura(TEXTURA_INFO,      TEXTURA_INFO_COLOR),
     'malla':     cargar_textura(TEXTURA_REGLAS,    TEXTURA_REGLAS_COLOR),
     'gotele':    cargar_textura(TEXTURA_BOTON,     TEXTURA_BOTON_COLOR),
+}
+
+# Canales de sonido. Un canal sólo puede reproducir un sonido al mismo tiempo,
+# de manera que ordenando los sonidos por canales evitamos que se solapen
+# sonidos que no queremos. Por defecto puede haber 8 canales.
+g_canales = {
+    'interfaz': pygame.mixer.Channel(0),
+    'efectos': pygame.mixer.Channel(1)
 }
 
 # < -------------------------------------------------------------------------- >
@@ -408,6 +420,7 @@ class Infraestructura(MedioEstrategico):
         """Mejorar el nivel y las propiedades de la infraestructura"""
         if self.jugador.pagar(self.PRECIO_MEJORA):
             self.nivel += 1
+            reproducir_sonido('construir', 'efectos')
 
     def cosechar(self):
         """Obtener el bonus económico que otorga la infraestructura"""
@@ -540,7 +553,7 @@ class Casilla:
             return
         self.sel = True
         g_escenario.casilla_sobre = self
-        reproducir_sonido('casilla_sel')
+        reproducir_sonido('casilla_sel', 'interfaz')
 
     def deseleccionar(self):
         """Deseleccionar la casilla"""
@@ -555,7 +568,7 @@ class Casilla:
             return
         self.pul = True
         g_escenario.casilla_pulsa = self
-        reproducir_sonido('casilla_pul')
+        reproducir_sonido('casilla_pul', 'interfaz')
 
     def despulsar(self):
         """Despulsar la casilla"""
@@ -827,8 +840,8 @@ class Reglamento:
         w = self.panel.rect.w
         dy = self.TAMANO_TITULO + 10 + self.LINEAS_POR_PAGINA * fuente.get_linesize() + 40
         self.botones = [
-            Boton((0, dy), texto='Anterior',  tamaño=self.TAMANO_BOTONES, accion=self.pagina_anterior,  surface=self.panel.lienzo, origen=(x,y)),
-            Boton((0, dy), texto='Siguiente', tamaño=self.TAMANO_BOTONES, accion=self.pagina_siguiente, surface=self.panel.lienzo, origen=(x,y)),
+            Boton((0, dy), texto='Anterior',  tamaño=self.TAMANO_BOTONES, accion=self.pagina_anterior,  surface=self.panel.lienzo, origen=(x,y), audio_pul='pagina'),
+            Boton((0, dy), texto='Siguiente', tamaño=self.TAMANO_BOTONES, accion=self.pagina_siguiente, surface=self.panel.lienzo, origen=(x,y), audio_pul='pagina'),
             Boton((0, dy), texto='Salir',     tamaño=self.TAMANO_BOTONES, accion=self.resetear,         surface=self.panel.lienzo, origen=(x,y), audio_pul='puerta_cierra')
         ]
         anchura = sum(boton.dim[0] for boton in self.botones) + 10 * (len(self.botones) - 1)
@@ -858,7 +871,7 @@ class Reglamento:
         if self.pagina > 0:
             self.pagina -= 1
         else:
-            reproducir_sonido('error')
+            reproducir_sonido('error', 'interfaz')
         self.renderizar()
 
     def pagina_siguiente(self):
@@ -866,7 +879,7 @@ class Reglamento:
         if self.pagina < self.paginas - 1:
             self.pagina += 1
         else:
-            reproducir_sonido('error')
+            reproducir_sonido('error', 'interfaz')
         self.renderizar()
 
     def resetear(self):
@@ -923,37 +936,38 @@ class Jugador:
         infra = casilla.infraestructura
         if infra:
             if type(infra) is not producto: # Infraestructura de otro tipo -> Error
-                reproducir_sonido('error')
+                reproducir_sonido('error', 'interfaz')
             elif g_fase != 'Preparación':   # Infraestructura del mismo tipo -> Mejorar
                 infra.mejorar()
             else:                           # No se puede mejorar en fase de preparación
-                reproducir_sonido('error')
+                reproducir_sonido('error', 'interfaz')
         else:                               # No hay infraestructura -> Construir
             if g_fase == 'Preparación':
                 cantidad = sum(1 for infra in self.infraestructuras if type(infra) is producto)
                 limite = { Ciudad: CANTIDAD_CIUDAD, Base: CANTIDAD_BASE, Capital: CANTIDAD_CAPITAL }[producto]
                 if cantidad >= limite:
-                    reproducir_sonido('error')
+                    reproducir_sonido('error', 'interfaz')
                     return
             elif not self.pagar(producto.PRECIO):
                     return
             infra = producto(self, casilla)
             casilla.infraestructura = infra
             self.infraestructuras.append(infra)
+            reproducir_sonido('construir', 'efectos')
 
     def pagar(self, cantidad):
         """Desembolsar una cierta cantidad, si hay crédito disponible"""
         if self.credito < cantidad:
-            reproducir_sonido('error')
+            reproducir_sonido('error', 'interfaz')
             return False
-        reproducir_sonido('pagar')
+        reproducir_sonido('pagar', 'efectos')
         self.credito -= cantidad
         return True
 
     def cobrar(self, cantidad):
         """Obtener una cierta cantidad de crédito"""
         self.credito += cantidad
-        reproducir_sonido('cobrar')
+        reproducir_sonido('cobrar', 'efectos')
 
 class Tienda:
     """Contiene todos los productos que se pueden adquirir y se encarga de su funcionalidad y renderizado"""
@@ -1192,11 +1206,11 @@ class Boton:
 
         # Reproducir sonidos
         if not selec_antes and self.selec and self.audio_sel:
-            reproducir_sonido(self.audio_sel)
+            reproducir_sonido(self.audio_sel, 'interfaz')
         if not pulsado_antes and self.pulsado and self.audio_pul:
-            reproducir_sonido(self.audio_pul)
+            reproducir_sonido(self.audio_pul, 'interfaz')
         if self.pulsado and self.block:
-            reproducir_sonido('error')
+            reproducir_sonido('error', 'interfaz')
 
         # Actualizar color y renderizar boton
         if self.pulsado:
