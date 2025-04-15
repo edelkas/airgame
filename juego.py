@@ -27,7 +27,6 @@
 #       Esqueleto del proceso en cada fotograma: escanear eventos,
 #       actualizar estado, y dibujar en pantalla.
 
-import enum    # Clases que funcionan como un enum de C
 import math    # Operaciones y funciones matemáticas
 import os      # Manipulaciones del sistema
 import pygame  # Motor del juego
@@ -89,8 +88,9 @@ BOTON_COLOR_PULSA  = "#a9b7fb" # Color del fondo cuando está pulsado
 BOTON_TAMANO_LETRA = 16        # Tamaño de la letra
 
 # Recursos (sonidos, imágenes...)
-MUSICA_FONDO       = "topgunmusic.ogg"
 IMAGEN_FONDO       = "imagenairgame.jpg"
+MUSICA_FONDO       = "topgunmusic.ogg"
+
 SONIDO_PAGAR       = "cajaregistradora.ogg"
 SONIDO_COBRAR      = "monedas.ogg"
 SONIDO_ERROR       = "error.ogg"
@@ -98,6 +98,7 @@ SONIDO_BOTON_SEL   = 'click.ogg'
 SONIDO_BOTON_PUL   = 'switch.ogg'
 SONIDO_CASILLA_SEL = 'glass.ogg'
 SONIDO_CASILLA_PUL = 'casilla.ogg'
+
 TEXTURA_ESCENARIO  = 'textura_hierba.png'
 TEXTURA_TIENDA     = 'textura_ladrillos.png'
 TEXTURA_INFO       = 'textura_piedras.png'
@@ -120,12 +121,16 @@ MAPA_COLOR_J2      = "#f8cbad" # Color de casilla con superioridad aerea de J2
 MAPA_COLOR_J1_F    = "#2e75b6" # Color de casilla con supremacia aerea de J1
 MAPA_COLOR_J2_F    = "#c55a11" # Color de casilla con supremacia aerea de J2
 MAPA_COLOR_BORDE   = "#9900cc" # Color del borde de la casilla actualmente seleccionada
-MAPA_BORDE_CASILLA = 0.25      # Proporcion de anchura de la casilla que supone el borde, en caso de tener
 
 # Sistema de puntos y superioridad aerea
 COEF_SUP        = 20  # Coeficiente de sup aerea en una casilla normal
 SUP_INICIAL     = 0.1 # Proporción de casillas iniciales con supremacia (aleatorias)
 MULT_SUPREMACIA = 2   # Ratio entre superioridad y supremacia aerea
+
+# Reglas
+CANTIDAD_CAPITAL = 1 # Cantidad inicial de capitales
+CANTIDAD_CIUDAD  = 2 # Cantidad inicial de ciudades normales
+CANTIDAD_BASE    = 3 # Cantidad inicial de bases aéreas
 
 # Recuadros de ayuda e informacion
 AYUDA_COLOR = (255, 255, 192) # Color del fondo
@@ -236,6 +241,9 @@ class Medio:
     VIGILANCIA = None
     RADIOVIG   = None
     SUPAEREA   = None
+
+    def __init__(self, jugador):
+        self.jugador = jugador
 
     @classmethod
     def info(cls):
@@ -380,9 +388,15 @@ class Infraestructura(MedioEstrategico):
     BONUS   = 0 # Crédito (en M) otorgado al jugador por turno y nivel
     NIVELES = 9 # Maximo nivel de una infraestructura
 
-    def __init__(self, jugador):
-        self.jugador = jugador
+    def __init__(self, jugador, casilla):
+        super().__init__(jugador)
+        self.casilla = casilla
         self.nivel = 1
+
+    def destruir(self):
+        """Eliminar la infraestructura"""
+        self.casilla.infraestructura = None
+        self.jugador.infraestructuras.remove(self)
 
     def mejorar(self):
         """Mejorar el nivel y las propiedades de la infraestructura"""
@@ -436,6 +450,7 @@ class Casilla:
         self.y = y
         self.centro = pygame.math.Vector2(Escenario.ORIGEN_X + self.DIM_X * (x + (y % 2) / 2), Escenario.ORIGEN_Y + self.DIM_Y * y)
         self.verts = [self.centro + v for v in esc.hex_vertices]
+        self.infraestructura = None
         self.resetear()
 
     def resetear(self):
@@ -450,9 +465,9 @@ class Casilla:
     def asignar(self):
         """Determinar propietario de la casilla, que tiene inicialmente la superioridad aerea"""
         if self.x < MAPA_DIM_J:
-            self.jugador = 0
+            self.jugador = g_jugadores[0]
         elif self.x >= MAPA_DIM_X - MAPA_DIM_J:
-            self.jugador = 1
+            self.jugador = g_jugadores[1]
         else:
             self.jugador = None
 
@@ -464,27 +479,17 @@ class Casilla:
         self.supCas = infra.SUP + infra.INC * infra.nivel if infra else COEF_SUP
 
         # Coeficiente de superioridad actual
-        if self.jugador == 0:
-            self.sup = self.supCas
-        elif self.jugador == 1:
-            self.sup = -self.supCas
-        else:
+        if not self.jugador:
             self.sup = 0
-
-    def construir(self, producto):
-        """Construir una infraestructura en la casilla"""
-        infra = self.infraestructura
-        if infra:
-            if type(infra) is not producto:
-                reproducir_sonido('error')
-            else:
-                infra.mejorar()
-        elif g_jugador.pagar(producto.PRECIO):
-            self.infraestructura = producto(g_jugador)
+        elif self.jugador.indice == 0:
+            self.sup = self.supCas
+        else:
+            self.sup = -self.supCas
 
     def destruir(self):
         """Destruir la infraestructura de la casilla"""
-        self.infraestructura = None
+        if self.infraestructura:
+            self.infraestructura.destruir()
 
     def raton(self, pos_vec):
         """Detecta si el ratón está sobre la casilla. Aproximamos el hexágono por el círculo inscrito."""
@@ -578,8 +583,8 @@ class Escenario:
 
         # Generar nuevas casillas aleatorias con supremacia
         supremacia = int(MAPA_DIM_J * MAPA_DIM_Y * SUP_INICIAL)
-        for jugador in range(2):
-            casillas = [c for col in self.casillas for c in col if c.jugador == jugador]
+        for j in range(2):
+            casillas = [c for col in self.casillas for c in col if c.jugador == g_jugadores[j]]
             for casilla in random.sample(casillas, supremacia):
                 casilla.sup *= MULT_SUPREMACIA
                 casilla.colorear()
@@ -653,6 +658,7 @@ class Informacion:
         self.texto = None
         x, y, w, h = self.panel.rect
         self.botones = [
+            Boton((0, 0), texto="Jugar",     anchura=80, accion=siguiente_jugador),
             Boton((0, 0), texto="Música",    anchura=80, accion=cambiar_musica),
             Boton((0, 0), texto="Reglas",    anchura=80, accion=g_reglas.mostrar),
             Boton((0, 0), texto="Reiniciar", anchura=80, accion=resetear),
@@ -890,21 +896,34 @@ class Jugador:
 
     def __init__(self):
         self.indice = self.jugadores
-        self.jugadores += 1
+        type(self).jugadores += 1
         self.resetear()
 
     def resetear(self):
         """Reiniciar el estado del jugador"""
-        self.inventario = { producto: 0 for producto in Tienda.MEDIOS }
-        self.credito    = CREDITO_INICIAL
+        self.medios           = []
+        self.infraestructuras = []
+        self.credito          = CREDITO_INICIAL
 
-    def comprar(self, medio):
-        """Adquirir un producto y añadirlo al inventario"""
-        if not self.pagar(medio.PRECIO):
+    def comprar(self, producto):
+        """Adquirir un medio y añadirlo al inventario"""
+        if not self.pagar(producto.PRECIO):
             return
-        if medio in self.inventario:
-            self.inventario[medio] += 1
-            g_tienda.botones[medio].indice = self.inventario[medio]
+        if producto in g_tienda.MEDIOS:
+            self.medios.append(producto(self))
+
+    def construir(self, producto, casilla):
+        """Construir o mejorar una infraestructura en el mapa"""
+        infra = casilla.infraestructura
+        if infra:
+            if type(infra) is not producto:
+                reproducir_sonido('error')
+            else:
+                infra.mejorar()
+        elif self.pagar(producto.PRECIO):
+            infra = producto(self, casilla)
+            casilla.infraestructura = infra
+            self.infraestructuras.append(infra)
 
     def pagar(self, cantidad):
         """Desembolsar una cierta cantidad, si hay crédito disponible"""
@@ -952,28 +971,35 @@ class Tienda:
             accion = lambda p: g_jugador.comprar(p)
             args = (producto,)
         elif producto is Ciudad:
-            accion = lambda: g_escenario.casilla_pulsa.construir(Ciudad)
+            accion = lambda: g_jugador.construir(Ciudad, g_escenario.casilla_pulsa)
         elif producto is Base:
-            accion = lambda: g_escenario.casilla_pulsa.construir(Base)
+            accion = lambda: g_jugador.construir(Base, g_escenario.casilla_pulsa)
         return Boton((0, 0), imagen=producto.ICONO, ayuda=f"{producto.NOMBRE} ({producto.PRECIO}M)", info=producto.info(), indice=0, accion=accion, args=args, audio_pul=None)
 
     def actualizar(self):
         """Actualizar estado del contenido de la tienda"""
 
-        # Actualizar texto de botones de infraestructuras, que se pueden mejorar
-        casilla = g_escenario.casilla_pulsa
-        for infra in self.INFRAESTRUCTURAS:
-            if casilla and type(casilla.infraestructura) is infra and casilla.infraestructura.jugador == g_jugador:
-                self.botones[infra].ayuda = f"Mejorar {infra.NOMBRE} ({infra.PRECIO_MEJORA}M)"
-            else:
-                self.botones[infra].ayuda = f"{infra.NOMBRE} ({infra.PRECIO}M)"
-
-        # Actualizar todos los botones de la tienda
-        for producto, boton in self.botones.items():
-            if producto in self.MEDIOS and g_fase == 'Preparación':
+        # Actualizar botones de medios
+        for medio in self.MEDIOS:
+            boton = self.botones[medio]
+            if g_fase == 'Preparación':
                 boton.bloquear()
             else:
                 boton.desbloquear()
+            boton.indice = sum(1 for producto in g_jugador.medios if type(producto) is medio)
+            boton.actualizar()
+
+        # Actualizar botones de infraestructuras
+        casilla = g_escenario.casilla_pulsa
+        visibles = casilla and casilla.hay_supremacia()
+        for infra in self.INFRAESTRUCTURAS:
+            boton = self.botones[infra]
+            boton.visible = visibles
+            if casilla and type(casilla.infraestructura) is infra and casilla.infraestructura.jugador == g_jugador:
+                boton.ayuda = f"Mejorar {infra.NOMBRE} ({infra.PRECIO_MEJORA}M)"
+            else:
+                boton.ayuda = f"{infra.NOMBRE} ({infra.PRECIO}M)"
+            boton.indice = sum(1 for producto in g_jugador.infraestructuras if type(producto) is infra)
             boton.actualizar()
 
     def dibujar(self):
@@ -982,17 +1008,13 @@ class Tienda:
         linea = g_fuentes[self.TAM_FUENTE].get_linesize()
         texto(f"Crédito: {g_jugador.credito}M", (ANCHURA * ANCHURA_JUEGO + PANEL_SEPARACION, PANEL_SEPARACION), tamaño=self.TAM_FUENTE)
         texto('Tienda', (ANCHURA * (ANCHURA_JUEGO + 1) / 2, PANEL_SEPARACION + linea), tamaño=self.TAM_FUENTE, alineado_h='c', subrayado=True)
-        for medio in self.MEDIOS:
-            self.botones[medio].dibujar()
-        if g_escenario.casilla_pulsa and g_escenario.casilla_pulsa.hay_supremacia():
-            for medio in self.INFRAESTRUCTURAS:
-                self.botones[medio].dibujar()
+        for boton in self.botones.values():
+            boton.dibujar()
 
     def resetear(self):
         """Reiniciar el contenido de la tienda"""
         for producto, boton in self.botones.items():
             boton.resetear()
-            boton.ayuda = f"{producto.NOMBRE} ({producto.PRECIO}M)"
 
 # < -------------------------------------------------------------------------- >
 #                             CLASES DE LA INTERFAZ
@@ -1066,7 +1088,7 @@ class Boton:
     def __init__(
             self, pos, origen=(0,0), texto=None, tamaño=BOTON_TAMANO_LETRA, imagen=None, ayuda=None, textura='gotele',
             info=None, indice=None, accion=None, args=(), surface=g_pantalla, audio_sel='boton_sel', audio_pul='boton_pul',
-            anchura=None, altura=None, bloqueado=False
+            anchura=None, altura=None, bloqueado=False, visible=True
         ):
         if not texto and not imagen:
             return
@@ -1085,6 +1107,9 @@ class Boton:
         self.anchura    = anchura   # Anchura mínima del botón
         self.altura     = altura    # Altura mínima del botón
         self.block_orig = bloqueado # Un botón bloqueado no puede usarse. Copia del valor original, que puede cambiar.
+        self.visible    = visible   # Un botón no visible no se actualiza ni dibuja
+        self.selec      = False     # Verdadero si el ratón está encima del botón
+        self.pulsado    = False     # Verdadero si el botón está siendo pulsado
 
         # Calculamos el tamaño del boton
         if texto:
@@ -1123,13 +1148,24 @@ class Boton:
         """Desbloquear el boton para que pueda volver a usarse"""
         self.block = False
 
+    def mostrar(self):
+        """Hacer el botón visible"""
+        self.visible = True
+
+    def ocultar(self):
+        """Hacer el botón invisible (y, por ende, desactivado)"""
+        self.visible = False
+
     def actualizar(self):
         """Actualizar estado y propiedades del boton"""
+        if not self.visible:
+            return
+
         # Modificar estado (seleccionado / pulsado) y detectar cambios
         selec_antes = self.selec
         pulsado_antes = self.pulsado
         self.selec = self.panel.raton()
-        self.pulsado = self.selec and g_click and not self.block
+        self.pulsado = self.selec and g_click
         cambio = selec_antes != self.selec or pulsado_antes != self.pulsado
 
         # Reproducir sonidos
@@ -1137,7 +1173,7 @@ class Boton:
             reproducir_sonido(self.audio_sel)
         if not pulsado_antes and self.pulsado and self.audio_pul:
             reproducir_sonido(self.audio_pul)
-        if self.selec and g_click and self.block:
+        if self.pulsado and self.block:
             reproducir_sonido('error')
 
         # Actualizar color y renderizar boton
@@ -1157,7 +1193,7 @@ class Boton:
             g_ayuda = self.ayuda
 
         # Ejecutar acción si está pulsado
-        if self.pulsado and self.accion:
+        if self.pulsado and self.accion and not self.block:
             self.accion(*self.args)
 
         # Devolver si ha habido cambio de estado
@@ -1176,12 +1212,11 @@ class Boton:
 
     def dibujar(self):
         """Dibujar el botón en pantalla. Hay que llamarlo cada fotograma."""
-        self.panel.dibujar()
+        if self.visible:
+            self.panel.dibujar()
 
     def resetear(self):
         """Reiniciar los valores del botón <<a fábica>>"""
-        self.selec   = False # Verdadero si el ratón está encima del botón
-        self.pulsado = False # Verdadero si el botón está siendo pulsado
         self.block   = self.block_orig
         if self.indice:
             self.indice = 0
@@ -1317,14 +1352,6 @@ def actualizar_fondo():
     """Dibujar el fondo (primera capa del display)"""
     g_pantalla.fill(COLOR_FONDO)
 
-def cambiar_jugador():
-    """Cambiar de turno"""
-    global g_jugador
-    if not g_jugador:
-        g_jugador = g_jugadores[0]
-    else:
-        g_jugador = g_jugadores[(g_jugador.indice + 1) % 2]
-
 def cambiar_musica():
     """Mutear o no la música de fondo"""
     if g_config['musica']:
@@ -1339,13 +1366,13 @@ def siguiente_fotograma():
     pygame.display.flip()   # Renderizar fotograma en pantalla y cambiar buffer
     g_reloj.tick(FPS)       # Avanzar reloj y limitar frecuencia de fotogramas
 
-def cambiar_fase(nombre):
-    """Cambiar a otra fase del juego"""
-    global g_fase
-    if nombre in g_fases:
-        g_fase = nombre
-        return True
-    return False
+def siguiente_jugador():
+    """Cambiar de turno"""
+    global g_jugador
+    if not g_jugador:
+        g_jugador = g_jugadores[0]
+    else:
+        g_jugador = g_jugadores[(g_jugador.indice + 1) % 2]
 
 def siguiente_fase():
     """Avanzar a la siguiente fase del juego"""
@@ -1355,6 +1382,14 @@ def siguiente_fase():
         g_fase = g_fases[indice + 1]
     else:
         resetear_fase()
+
+def cambiar_fase(nombre):
+    """Cambiar a otra fase del juego"""
+    global g_fase
+    if nombre in g_fases:
+        g_fase = nombre
+        return True
+    return False
 
 def resetear_fase():
     """Volver a la primera fase del juego"""
@@ -1383,8 +1418,6 @@ def actualizar_fase_reglas():
 def actualizar_fase_turnos():
     """Actualizar estado en la fase de turnos"""
     visible = not g_reglas.visible
-    if not g_jugador:
-        cambiar_jugador()
 
     # Actualizar estado sólo si el escenario es visible
     if visible:
@@ -1431,13 +1464,13 @@ paneles = {
     'informacion': Panel((sep, ALTURA * ALTURA_JUEGO + sep / 2), (ANCHURA - 2 * sep, ALTURA * ALTURA_INFORMACION - 1.5 * sep), 'información', textura='piedras')
 }
 
-# Inicializar algunas variables globales
+# Inicializar algunas variables globales (no cambiar estas líneas de orden)
+g_jugadores = [Jugador() for _ in range(2)]         # Lista de jugadores
+g_jugador   = g_jugadores[0]                        # Jugador actual
 g_reglas    = Reglamento()                          # Paginador de reglas
 g_escenario = Escenario(paneles['escenario'])       # Casillas del mapa y su contenido
 g_tienda    = Tienda(paneles['tienda'])             # Tienda de productos
 g_info      = Informacion(paneles['informacion'])   # Panel informativo inferior
-g_jugadores = [Jugador() for _ in range(2)]         # Lista de jugadores
-g_jugador   = None                                  # Jugador actual
 
 # Fases del juego
 g_fases = ['Pantallazo', 'Reglas', 'Preparación', 'Turnos', 'Final']
