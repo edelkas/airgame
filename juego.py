@@ -32,7 +32,6 @@ import math    # Operaciones y funciones matemáticas
 import os      # Manipulaciones del sistema
 import pygame  # Motor del juego
 import random  # Para generacion de números aleatorios
-import re      # Para expresiones regulares (regex)
 
 # Lo siguiente es para evitar que se muestre publicidad de PyGame en la consola al iniciar
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
@@ -251,7 +250,7 @@ class Medio:
         if cls.VIGILANCIA: texto += f"Vigilancia:   {cls.VIGILANCIA}\n"
         if cls.RADIOVIG:   texto += f"Radio vigil.: {cls.RADIOVIG}\n"
         if cls.SUPAEREA:   texto += f"Sup. aérea:   {cls.SUPAEREA}"
-        return re.sub(r"^\s+", "", texto, flags = re.MULTILINE)
+        return texto
 
 class MedioAereo(Medio):
     """Representa cualquier medio aéreo"""
@@ -678,8 +677,12 @@ class Informacion:
     def dibujar(self):
         """Renderizar el texto en pantalla"""
         self.panel.dibujar()
+        x, y, w, h = self.panel.rect
+        nombres = "Fase:\nTurno:"
+        valores = f"{g_fase}\nJugador {g_jugador.indice + 1}"
+        texto_multilinea(nombres, (x + w - 150, y), 16, negrita = True)
+        texto_multilinea(valores, (x + w - 100, y), 16)
         if self.texto:
-            x, y, w, h = self.panel.rect
             texto_multilinea(self.texto, (x + 10, y + 30), 14, mono = True, max_ancho = w)
         for boton in self.botones:
             boton.dibujar()
@@ -1168,13 +1171,6 @@ class Boton:
             self.indice = 0
         self.renderizar()
 
-class Fase(enum.IntEnum):
-    """Representa cada posible fase del juego"""
-    PANTALLAZO = 1
-    REGLAS     = 2
-    TURNOS     = 3
-    FINAL      = 4
-
 # < -------------------------------------------------------------------------- >
 #                         FUNCIONES AUXILIARES INTERFAZ
 # < -------------------------------------------------------------------------- >
@@ -1324,16 +1320,30 @@ def cambiar_musica():
 
 def siguiente_fotograma():
     """Avanzar fotograma"""
-    pygame.display.flip() # Renderizar fotograma en pantalla y cambiar buffer
+    pygame.display.flip()   # Renderizar fotograma en pantalla y cambiar buffer
     g_reloj.tick(FPS)       # Avanzar reloj y limitar frecuencia de fotogramas
+
+def cambiar_fase(nombre):
+    """Cambiar a otra fase del juego"""
+    global g_fase
+    if nombre in g_fases:
+        g_fase = nombre
+        return True
+    return False
 
 def siguiente_fase():
     """Avanzar a la siguiente fase del juego"""
     global g_fase
-    if g_fase < Fase.FINAL:
-        g_fase += 1
+    indice = g_fases.index(g_fase)
+    if indice < len(g_fases) - 1:
+        g_fase = g_fases[indice + 1]
     else:
-        g_fase = Fase.PANTALLAZO
+        resetear_fase()
+
+def resetear_fase():
+    """Volver a la primera fase del juego"""
+    global g_fase
+    g_fase = g_fases[0]
 
 def actualizar_variables():
     """Actualizacion de variables en cada fotograma"""
@@ -1378,14 +1388,13 @@ def actualizar_fase_turnos():
         actualizar_fase_reglas()
 
 def resetear():
-    global g_fase
     g_reglas.resetear()
     g_escenario.resetear()
     g_tienda.resetear()
     g_info.resetear()
     for jugador in g_jugadores:
         jugador.resetear()
-    g_fase = Fase.TURNOS
+    resetear_fase()
 
 def salir():
     pygame.event.post(pygame.event.Event(pygame.QUIT))
@@ -1408,18 +1417,20 @@ paneles = {
 
 # Inicializar algunas variables globales
 g_reglas    = Reglamento()                          # Paginador de reglas
-g_escenario = Escenario(paneles['escenario'])     # Casillas del mapa y su contenido
-g_tienda    = Tienda(paneles['tienda'])           # Tienda de productos
-g_info      = Informacion(paneles['informacion']) # Panel informativo inferior
-g_fase      = Fase.PANTALLAZO                       # Inicializar juego en la primera fase
+g_escenario = Escenario(paneles['escenario'])       # Casillas del mapa y su contenido
+g_tienda    = Tienda(paneles['tienda'])             # Tienda de productos
+g_info      = Informacion(paneles['informacion'])   # Panel informativo inferior
 g_jugadores = [Jugador() for _ in range(2)]         # Lista de jugadores
 g_jugador   = None                                  # Jugador actual
+
+# Fases del juego
+g_fases = ['Pantallazo', 'Reglas', 'Preparación', 'Turnos', 'Final']
+g_fase = g_fases[0]
 
 # Configuracion
 g_config = {
     'musica': MUSICA_REPRODUCIR
 }
-
 
 # Estado
 g_raton = pygame.mouse.get_pos()
@@ -1446,15 +1457,15 @@ while True:
     actualizar_fondo()     # Colorear fondo
 
     # Ejecutar cada fase del juego
-    if g_fase == Fase.PANTALLAZO:       # Pantallazo inicial
+    if g_fase == 'Pantallazo':                        # Pantallazo inicial
         actualizar_fase_pantallazo()
         if g_click:
             siguiente_fase()
-    elif g_fase == Fase.REGLAS:         # Pantallazo de reglas
+    elif g_fase == 'Reglas':                          # Pantallazo de reglas
         actualizar_fase_reglas()
         if not g_reglas.visible:
             siguiente_fase()
-    elif g_fase == Fase.TURNOS:         # Fase central del juego
+    elif g_fase in ['Preparación', 'Turnos']:         # Fase central del juego
         actualizar_fase_turnos()
     else:
         pass
