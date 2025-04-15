@@ -53,7 +53,7 @@ PANTALLA_COMPLETA               = False     # Para abrir el juego en ventana com
 PANTALLA_MODIFICARDIMENSION     = False     # Para poder modificar la dimensión de la ventana
 FPS                             = 60        # Fotogramas por segundo
 COLOR_FONDO                     = "#cccccc" # Color RGB del fondo de pantalla
-MUSICA_REPRODUCIR               = True      # Activar o desactivar la música por defecto
+MUSICA_REPRODUCIR               = False     # Activar o desactivar la música por defecto
 MUSICA_VOLUMEN                  = 0.5       # Volumen relativo de la musica (0.0 - 1.0)
 
 # Carpetas de ficheros del juego
@@ -91,7 +91,7 @@ BOTON_TAMANO_LETRA = 16        # Tamaño de la letra
 
 # Recursos (sonidos, imágenes...)
 MUSICA_FONDO       = "topgunmusic.ogg"
-IMAGEN_FONDO       = "imagenairgame.png"
+IMAGEN_FONDO       = "imagenairgame.jpg"
 SONIDO_PAGAR       = "cajaregistradora.ogg"
 SONIDO_COBRAR      = "monedas.ogg"
 SONIDO_ERROR       = "error.ogg"
@@ -619,6 +619,7 @@ class Informacion:
         self.texto = None
         x, y, w, h = self.panel.rect
         self.botones = [
+            Boton((0, 0), texto="Música",    accion=cambiar_musica),
             Boton((0, 0), texto="Reglas",    accion=g_reglas.mostrar),
             Boton((0, 0), texto="Reiniciar", accion=resetear),
             Boton((0, 0), texto="Salir",     accion=salir)
@@ -1256,6 +1257,15 @@ def cambiar_jugador():
     else:
         g_jugador = g_jugadores[(g_jugador.indice + 1) % 2]
 
+def cambiar_musica():
+    """Mutear o no la música de fondo"""
+    if g_config['musica']:
+        pygame.mixer.music.set_volume(0)
+        g_config['musica'] = False
+    else:
+        pygame.mixer.music.set_volume(MUSICA_VOLUMEN)
+        g_config['musica'] = True
+
 def siguiente_fotograma():
     """Avanzar fotograma"""
     pygame.display.flip() # Renderizar fotograma en pantalla y cambiar buffer
@@ -1323,14 +1333,14 @@ def resetear():
 
 def salir():
     pygame.event.post(pygame.event.Event(pygame.QUIT))
+
 # < -------------------------------------------------------------------------- >
 #                           INICIALIZACIÓN DEL JUEGO
 # < -------------------------------------------------------------------------- >
 
 # Comenzar musica
-if MUSICA_REPRODUCIR:
-    pygame.mixer.music.set_volume(MUSICA_VOLUMEN)
-    pygame.mixer.music.play(-1)
+pygame.mixer.music.set_volume(MUSICA_VOLUMEN if MUSICA_REPRODUCIR else 0)
+pygame.mixer.music.play(-1)
 
 # Configurar paneles
 sep = PANEL_SEPARACION
@@ -1349,7 +1359,10 @@ g_fase      = Fase.PANTALLAZO                       # Inicializar juego en la pr
 g_jugadores = [Jugador() for _ in range(2)]         # Lista de jugadores
 g_jugador   = None                                  # Jugador actual
 
-# Configurar botones
+# Configuracion
+g_config = {
+    'musica': MUSICA_REPRODUCIR
+}
 
 
 # Estado
