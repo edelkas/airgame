@@ -232,7 +232,7 @@ g_texturas = {
 # sonidos que no queremos. Por defecto puede haber 8 canales.
 g_canales = {
     'interfaz': pygame.mixer.Channel(0),
-    'efectos': pygame.mixer.Channel(1)
+    'efectos':  pygame.mixer.Channel(1)
 }
 
 # < -------------------------------------------------------------------------- >
@@ -241,37 +241,53 @@ g_canales = {
 
 class Medio:
     """Clase genérica que representa cualquier medio militar"""
-    NOMBRE     = None
-    ICONO      = None
-    DESC       = None
-    PRECIO     = None
-    VELOCIDAD  = None
-    AUTONOMIA  = None
-    ALCANCE    = None
-    HUELLA     = None
-    AIRE       = None
-    SUP        = None
-    VIGILANCIA = None
-    RADIOVIG   = None
-    SUPAEREA   = None
+    NOMBRE        = None # Nombre del medio
+    ICONO         = None # Icono del botón en la tienda
+    DESC          = None # Breve descripción informativa
+    PRECIO        = None # Precio de compra (M€)
+    PRECIO_MEJORA = None # Precio de mejora - sólo para infraestructuras (M€)
+    VELOCIDAD     = None # Velocidad de avance de un medio aéreo (casillas por turno)
+    AUTONOMIA     = None # Tiempo que puede permanecer fuera de la base un medio aéreo (turnos)
+    ALCANCE       = None # Distancia de la base que puede recorrer un medio aéreo (turnos)
+    HUELLA        = None # Probabilidad de ser captado por una vigilancia (%)
+    DIST_AIRE     = None # Distancia a la que puede derribar un medio aéreo (casillas)
+    DIST_SUP      = None # Distancia a la que puede derribar un medio anti-aéreo (casillas)
+    VIGILANCIA    = None # Probabilidad de captar un medio aéreo con radar (%)
+    RADIOVIG      = None # Distancia a la que puede vigilar otros medios aéreos (casillas)
+    SUPAEREA      = None # Peso del medio a la hora de aportar superioridad aérea (puntos)
 
     def __init__(self, jugador):
         self.jugador = jugador
 
     @classmethod
     def info(cls):
-        texto = f"Descripción:  {cls.DESC}\n"
-        if cls.PRECIO:     texto += f"Precio:       {cls.PRECIO}\n"
-        if cls.VELOCIDAD:  texto += f"Velocidad:    {cls.VELOCIDAD}\n"
-        if cls.AUTONOMIA:  texto += f"Autonomía:    {cls.AUTONOMIA}\n"
-        if cls.ALCANCE:    texto += f"Alcance:      {cls.ALCANCE}\n"
-        if cls.HUELLA:     texto += f"Huella:       {cls.HUELLA}\n"
-        if cls.AIRE:       texto += f"Aire-aire:    {cls.AIRE}\n"
-        if cls.SUP:        texto += f"Aire-sup:     {cls.SUP}\n"
-        if cls.VIGILANCIA: texto += f"Vigilancia:   {cls.VIGILANCIA}\n"
-        if cls.RADIOVIG:   texto += f"Radio vigil.: {cls.RADIOVIG}\n"
-        if cls.SUPAEREA:   texto += f"Sup. aérea:   {cls.SUPAEREA}"
-        return texto
+
+        # Información breve en la ayuda del ratón
+        global g_ayuda
+        g_ayuda = f"{cls.NOMBRE} ({cls.PRECIO}M)"
+        if issubclass(cls, Infraestructura):
+            casilla = g_escenario.casilla_pulsa
+            if casilla and casilla.infraestructura:
+                infra = casilla.infraestructura
+                if type(infra) is cls and infra.jugador == g_jugador:
+                    g_ayuda = f"Mejorar {cls.NOMBRE} ({cls.PRECIO_MEJORA}M)"
+
+        # Texto informativo extenso en el panel inferior
+        nombres = "Descripción:"
+        valores = f"{cls.DESC}"
+        if cls.PRECIO:        nombres += "\nPrecio:";        valores += f"\n{cls.PRECIO}"
+        if cls.PRECIO_MEJORA: nombres += "\nPrecio mejora:"; valores += f"\n{cls.PRECIO_MEJORA}"
+        if cls.VELOCIDAD:     nombres += "\nVelocidad:";     valores += f"\n{cls.VELOCIDAD}"
+        if cls.AUTONOMIA:     nombres += "\nAutonomía:";     valores += f"\n{cls.AUTONOMIA}"
+        if cls.ALCANCE:       nombres += "\nAlcance:";       valores += f"\n{cls.ALCANCE}"
+        if cls.HUELLA:        nombres += "\nHuella:";        valores += f"\n{cls.HUELLA}"
+        if cls.DIST_AIRE:     nombres += "\nAire-aire:";     valores += f"\n{cls.DIST_AIRE}"
+        if cls.DIST_SUP:      nombres += "\nAire-sup:";      valores += f"\n{cls.DIST_SUP}"
+        if cls.VIGILANCIA:    nombres += "\nVigilancia:";    valores += f"\n{cls.VIGILANCIA}"
+        if cls.RADIOVIG:      nombres += "\nRadio-vigil.:";  valores += f"\n{cls.RADIOVIG}"
+        if cls.SUPAEREA:      nombres += "\nSup.-aerea:";    valores += f"\n{cls.SUPAEREA}"
+        g_info.escribir(nombres, (10, 30),  negrita = True)
+        g_info.escribir(valores, (120, 30))
 
 class MedioAereo(Medio):
     """Representa cualquier medio aéreo"""
@@ -292,8 +308,8 @@ class AvionCaza(MedioAereo):
     AUTONOMIA  = 1.62
     ALCANCE    = 3400
     HUELLA     = 4
-    AIRE       = 170
-    SUP        = 0
+    DIST_AIRE  = 170
+    DIST_SUP   = 0
     VIGILANCIA = 0
     RADIOVIG   = 0
     SUPAEREA   = 10
@@ -308,8 +324,8 @@ class AvionAtaque(MedioAereo):
     AUTONOMIA  = 5.04
     ALCANCE    = 6800
     HUELLA     = 15
-    AIRE       = 0
-    SUP        = 240
+    DIST_AIRE  = 0
+    DIST_SUP   = 240
     VIGILANCIA = 0
     RADIOVIG   = 0
     SUPAEREA   = 6
@@ -324,8 +340,8 @@ class AvionTransporte(MedioAereo):
     AUTONOMIA  = 12.93
     ALCANCE    = 10600
     HUELLA     = 60
-    AIRE       = 0
-    SUP        = 0
+    DIST_AIRE  = 0
+    DIST_SUP   = 0
     VIGILANCIA = 0
     RADIOVIG   = 0
     SUPAEREA   = 3
@@ -340,8 +356,8 @@ class Helicoptero(MedioAereo):
     AUTONOMIA  = 2.58
     ALCANCE    = 670
     HUELLA     = 10
-    AIRE       = 0
-    SUP        = 10
+    DIST_AIRE  = 0
+    DIST_SUP   = 10
     VIGILANCIA = 0
     RADIOVIG   = 0
     SUPAEREA   = 4
@@ -356,8 +372,8 @@ class Dron(MedioAereo):
     AUTONOMIA  = 13.5
     ALCANCE    = 3240
     HUELLA     = 2
-    AIRE       = 0
-    SUP        = 100
+    DIST_AIRE  = 0
+    DIST_SUP   = 100
     VIGILANCIA = 20
     RADIOVIG   = 240
     SUPAEREA   = 2
@@ -369,8 +385,8 @@ class Radar(MedioAntiaereo):
     DESC       = 'Medio antiaéreo con el mayor alcance de vigilancia.'
     PRECIO     = 24
     HUELLA     = 100
-    AIRE       = 0
-    SUP        = 0
+    DIST_AIRE  = 0
+    DIST_SUP   = 0
     VIGILANCIA = 90
     RADIOVIG   = 440
     SUPAEREA   = 0
@@ -382,8 +398,8 @@ class Bateria(MedioAntiaereo):
     DESC       = 'Único medio antiaéreo con capacidad de vigilancia.'
     PRECIO     = 90
     HUELLA     = 100
-    AIRE       = 240
-    SUP        = 0
+    DIST_AIRE  = 240
+    DIST_SUP   = 0
     VIGILANCIA = 60
     RADIOVIG   = 260
     SUPAEREA   = 0
@@ -711,7 +727,7 @@ class Informacion:
     """Representa el panel informativo"""
     def __init__(self, panel):
         self.panel = panel
-        self.texto = None
+        self.textos = []
         x, y, w, h = self.panel.rect
         self.botones = [
             Boton((0, 0), texto="Jugar",     anchura=80, accion=siguiente_jugador),
@@ -723,13 +739,13 @@ class Informacion:
         for i, b in enumerate(reversed(self.botones)):
             b.mover(x + w - b.dim[0], y + h - (i + 1) * b.dim[1])
 
-    def escribir(self, texto):
+    def escribir(self, texto, pos, tamaño = 14, negrita = False):
         """Cambiar el texto del panel"""
-        self.texto = texto
+        self.textos.append({ 'texto': texto, 'pos': pos, 'tamaño': tamaño, 'negrita': negrita })
 
     def borrar(self):
         """Eliminar el texto del panel"""
-        self.texto = None
+        self.textos = []
 
     def actualizar(self):
         """Actualizar los contenidos del panel"""
@@ -742,10 +758,13 @@ class Informacion:
         x, y, w, h = self.panel.rect
         nombres = "Fase:\nTurno:"
         valores = f"{g_fase}\nJugador {g_jugador.indice + 1}"
+        if g_fase == 'Principal':
+            nombres += "\nPaso:"
+            valores += "\n{g_paso}"
         texto_multilinea(nombres, (x + w - 150, y), 16, negrita = True)
         texto_multilinea(valores, (x + w - 100, y), 16)
-        if self.texto:
-            texto_multilinea(self.texto, (x + 10, y + 30), 14, mono = True, max_ancho = w)
+        for texto in self.textos:
+            texto_multilinea(texto['texto'], (x + texto['pos'][0], y + texto['pos'][1]), texto['tamaño'], negrita = texto['negrita'], max_ancho = w - texto['pos'][0])
         for boton in self.botones:
             boton.dibujar()
 
@@ -805,8 +824,8 @@ class Reglamento:
             [AUTONOMÍA]: tiempo que va a poder estar fuera de la base un producto / (horas) - (turnos).
             [ALCANCE]: distancia (horizontal) a la que va a poder llegar un producto / (km) - (casillas).
             [HUELLA]: probabilidad de ser captado por una vigilancia 100% / (%).
-            [AIRE]: distancia a la que puede derribar un medio aéreo / (casillas).
-            [SUP]: distancia a la que puede derribar un medio antiaéreo / (casillas).
+            [DISTAIRE]: distancia a la que puede derribar un medio aéreo / (casillas).
+            [DISTSUP]: distancia a la que puede derribar un medio antiaéreo / (casillas).
             [VIGILANCIA]: probabilidad de captar un producto con huella radar 100% / (%).
             [RADIOVIG.]: distancia a la que puede vigilar otro producto / (km) - (casillas).
             [SUPAEREA]: peso de cada producto a la hora de aportar superioridad aérea / (número).
@@ -1047,7 +1066,7 @@ class Tienda:
             accion = lambda: g_jugador.construir(Ciudad, g_escenario.casilla_pulsa)
         elif producto is Base:
             accion = lambda: g_jugador.construir(Base, g_escenario.casilla_pulsa)
-        return Boton((0, 0), imagen=producto.ICONO, ayuda=f"{producto.NOMBRE} ({producto.PRECIO}M)", info=producto.info(), indice=0, accion=accion, args=args, audio_pul=None)
+        return Boton((0, 0), imagen=producto.ICONO, info=producto.info, indice=0, accion=accion, args=args, audio_pul=None)
 
     def actualizar(self):
         """Actualizar estado del contenido de la tienda"""
@@ -1069,9 +1088,11 @@ class Tienda:
             boton = self.botones[infra]
             boton.visible = visibles
             if casilla and type(casilla.infraestructura) is infra and casilla.infraestructura.jugador == g_jugador:
-                boton.ayuda = f"Mejorar {infra.NOMBRE} ({infra.PRECIO_MEJORA}M)"
+                pass
+                #boton.ayuda = f"Mejorar {infra.NOMBRE} ({infra.PRECIO_MEJORA}M)"
             else:
-                boton.ayuda = f"{infra.NOMBRE} ({infra.PRECIO}M)"
+                pass
+                #boton.ayuda = f"{infra.NOMBRE} ({infra.PRECIO}M)"
             boton.indexar(sum(1 for producto in g_jugador.infraestructuras if type(producto) is infra))
             boton.actualizar()
 
@@ -1159,7 +1180,7 @@ class Panel:
 class Boton:
     """Clase que representa un boton clickable"""
     def __init__(
-            self, pos, origen=(0,0), texto=None, tamaño=BOTON_TAMANO_LETRA, imagen=None, ayuda=None, textura='gotele',
+            self, pos, origen=(0,0), texto=None, tamaño=BOTON_TAMANO_LETRA, imagen=None, textura='gotele',
             info=None, indice=None, accion=None, args=(), surface=g_pantalla, audio_sel='boton_sel', audio_pul='boton_pul',
             anchura=None, altura=None, bloqueado=False, visible=True
         ):
@@ -1168,8 +1189,7 @@ class Boton:
         self.pos        = pos       # Posición del botón en pantalla
         self.texto      = None      # Texto del boton
         self.imagen     = None      # Imagen del boton
-        self.ayuda      = ayuda     # Pequeña descripción del botón, para cuando es seleccionado
-        self.info       = info      # Descripción más detallada del botón seleccionado
+        self.info       = info      # Función a ejecutar si el botón es seleccionado
         self.accion     = accion    # Función a ejecutar si el botón es pulsado
         self.args       = args      # Argumentos que mandar a la función acción, si son necesarios
         self.surface    = surface   # Superficie sobre la que se renderiza en boton
@@ -1267,9 +1287,7 @@ class Boton:
 
         # Mostrar información en el panel informativo
         if self.selec and self.info:
-            global g_ayuda
-            g_info.escribir(self.info)
-            g_ayuda = self.ayuda
+            self.info()
 
         # Ejecutar acción si está pulsado
         if self.pulsado and self.accion and not self.block:
@@ -1537,7 +1555,7 @@ def actualizar_fase_principal():
     if g_reglas.visible:
         actualizar_fase_reglas()
 
-    # Actualizar paso específico del turno g_pasos = ['Reporte', 'Inteligencia', 'Ingresos', 'Recursos', 'Ataque', 'Despliegue']
+    # Actualizar paso específico del turno
     if g_paso == 'Reporte':
         actualizar_paso_reporte()
     elif g_paso == 'Inteligencia':
@@ -1613,8 +1631,8 @@ g_jugadores = [Jugador() for _ in range(2)]         # Lista de jugadores
 g_jugador   = g_jugadores[0]                        # Jugador actual
 g_reglas    = Reglamento()                          # Paginador de reglas
 g_escenario = Escenario(paneles['escenario'])       # Casillas del mapa y su contenido
-g_tienda    = Tienda(paneles['tienda'])             # Tienda de productos
 g_info      = Informacion(paneles['informacion'])   # Panel informativo inferior
+g_tienda    = Tienda(paneles['tienda'])             # Tienda de productos
 
 # Fases y pasos del juego. Los pasos son las distintas etapas en las que se divide un turno.
 g_fases = ['Pantallazo', 'Reglas', 'Preparación', 'Principal', 'Final']
