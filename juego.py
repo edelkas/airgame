@@ -399,7 +399,7 @@ class Ciudad(Infraestructura):
     NOMBRE        = "Ciudad"
     ICONO         = g_iconos['Ciudad']
     DESC          = "Infraestructura que cosecha recursos cada turno."
-    PRECIO = 200
+    PRECIO        = 200
     PRECIO_MEJORA = 100
     SUP           = 40
     BONUS         = 10
@@ -410,7 +410,7 @@ class Base(Infraestructura):
     NOMBRE        = "Base aérea"
     ICONO         = g_iconos['Base']
     DESC          = "Infraestructura que permite desplegar medios aéreos."
-    PRECIO = 300
+    PRECIO        = 300
     PRECIO_MEJORA = 150
     SUP           = 60
     COLOR         = "#00b050"
@@ -418,7 +418,7 @@ class Base(Infraestructura):
 class Capital(Ciudad):
     """Ciudad principal del jugador. Además, perderla implica perder la partida."""
     NOMBRE        = "Capital"
-    PRECIO = 500
+    PRECIO        = 500
     PRECIO_MEJORA = 250
     SUP           = 100
     COLOR         = "#c09200"
@@ -441,6 +441,8 @@ class Casilla:
 
     def resetear(self):
         """Inicializar todas las propiedades y contenidos de la casilla"""
+        self.sel = False
+        self.pul = False
         self.asignar()
         self.destruir()
         self.recalcular()
@@ -517,14 +519,40 @@ class Casilla:
         if infra:
             pygame.draw.polygon(surface, infra.COLOR, self.verts, 4)
             texto(str(infra.nivel), self.centro, 12, infra.COLOR, alineado_h = 'c', alineado_v = 'c', negrita = True, surface = surface)
+        if self.sel:
+            pygame.draw.polygon(surface, MAPA_COLOR_BORDE, self.verts, 2)
+        if self.pul:
+            pygame.draw.polygon(surface, MAPA_COLOR_BORDE, self.verts, 4)
 
-    def seleccionar(self, surface):
-        """Destacar visualmente la casilla cuando el raton pasa por encima"""
-        pygame.draw.polygon(surface, MAPA_COLOR_BORDE, self.verts, 2)
+    def seleccionar(self):
+        """Seleccionar la casilla cuando el raton pasa por encima"""
+        if self.sel:
+            return
+        self.sel = True
+        g_escenario.casilla_sobre = self
+        reproducir_sonido('casilla_sel')
 
-    def pulsar(self, surface):
-        """Destacar visualmente la casilla cuando el raton hace click"""
-        pygame.draw.polygon(surface, MAPA_COLOR_BORDE, self.verts, 4)
+    def deseleccionar(self):
+        """Deseleccionar la casilla"""
+        if not self.sel:
+            return
+        self.sel = False
+        g_escenario.casilla_sobre = None
+
+    def pulsar(self):
+        """Pulsar la casilla cuando el raton hace click"""
+        if self.pul:
+            return
+        self.pul = True
+        g_escenario.casilla_pulsa = self
+        reproducir_sonido('casilla_pul')
+
+    def despulsar(self):
+        """Despulsar la casilla"""
+        if not self.pul:
+            return
+        self.pul = False
+        g_escenario.casilla_pulsa = None
 
 class Escenario:
     ORIGEN_X = (ANCHURA * ANCHURA_JUEGO - MAPA_DIM_X * Casilla.DIM_X) / 2
@@ -564,15 +592,13 @@ class Escenario:
 
     def actualizar(self):
         """Detectar si alguna casilla esta seleccionada o ha sido pulsada"""
-        pos_vec = pygame.Vector2(g_raton)
-        sobre_antes = self.casilla_sobre
-        self.casilla_sobre = None
 
-        # Si se clicka en el panel, se deselecciona la casilla
-        if self.panel.raton() and g_click:
-            self.casilla_pulsa = None
+        # Si el ratón no está sobre el panel del escenario, no hay nada que actualizar
+        if not self.panel.raton():
+            return
 
         # Aproximar la casilla en la que estamos, para evitar testearlas todas
+        pos_vec = pygame.Vector2(g_raton)
         d = (pos_vec - self.ORIGEN).elementwise() / Casilla.DIM
         x1 = max(round(d.x) - 1, 0)
         x2 = min(round(d.x) + 1, MAPA_DIM_X - 1)
@@ -583,14 +609,27 @@ class Escenario:
         for x in range(x1, x2 + 1):
             for y in range(y1, y2 + 1):
                 casilla = self.casillas[x][y]
-                if casilla.raton(pos_vec):
-                    self.casilla_sobre = casilla
-                    if sobre_antes != casilla:
-                        reproducir_sonido('casilla_sel')
-                    if g_click:
-                        self.casilla_pulsa = casilla
-                        reproducir_sonido('casilla_pul')
+                if not casilla.raton(pos_vec):
+                    continue
+
+                # Casilla seleccionada
+                if self.casilla_sobre and self.casilla_sobre != casilla:
+                    self.casilla_sobre.deseleccionar()
+                casilla.seleccionar()
+                if not g_click:
                     return
+
+                # Casilla pulsada
+                if self.casilla_pulsa and self.casilla_pulsa != casilla:
+                    self.casilla_pulsa.despulsar()
+                casilla.pulsar()
+                return
+
+        # Si llegamos aquí, ninguna casilla está seleccionada
+        if self.casilla_sobre:
+            self.casilla_sobre.deseleccionar()
+        if self.casilla_pulsa and g_click:
+            self.casilla_pulsa.despulsar()
 
     def dibujar(self):
         """Dibujar todas las celdas en pantalla"""
@@ -598,10 +637,6 @@ class Escenario:
         for columna in self.casillas:
             for casilla in columna:
                 casilla.dibujar(self.panel.surface)
-        if self.casilla_sobre:
-            self.casilla_sobre.seleccionar(self.panel.surface)
-        if self.casilla_pulsa:
-            self.casilla_pulsa.pulsar(self.panel.surface)
 
     def resetear(self):
         """Resetear los contenidos de todas las celdas"""
@@ -619,10 +654,10 @@ class Informacion:
         self.texto = None
         x, y, w, h = self.panel.rect
         self.botones = [
-            Boton((0, 0), texto="Música",    accion=cambiar_musica),
-            Boton((0, 0), texto="Reglas",    accion=g_reglas.mostrar),
-            Boton((0, 0), texto="Reiniciar", accion=resetear),
-            Boton((0, 0), texto="Salir",     accion=salir)
+            Boton((0, 0), texto="Música",    anchura=80, accion=cambiar_musica),
+            Boton((0, 0), texto="Reglas",    anchura=80, accion=g_reglas.mostrar),
+            Boton((0, 0), texto="Reiniciar", anchura=80, accion=resetear),
+            Boton((0, 0), texto="Salir",     anchura=80, accion=salir)
         ]
         for i, b in enumerate(reversed(self.botones)):
             b.mover(x + w - b.dim[0], y + h - (i + 1) * b.dim[1])
@@ -921,6 +956,16 @@ class Tienda:
 
     def actualizar(self):
         """Actualizar estado del contenido de la tienda"""
+
+        # Actualizar texto de botones de infraestructuras, que se pueden mejorar
+        casilla = g_escenario.casilla_pulsa
+        for infra in self.INFRAESTRUCTURAS:
+            if casilla and type(casilla.infraestructura) is infra and casilla.infraestructura.jugador == g_jugador:
+                self.botones[infra].ayuda = f"Mejorar {infra.NOMBRE} ({infra.PRECIO_MEJORA}M)"
+            else:
+                self.botones[infra].ayuda = f"{infra.NOMBRE} ({infra.PRECIO}M)"
+
+        # Actualizar todos los botones de la tienda
         for boton in self.botones.values():
             boton.actualizar()
 
@@ -1013,7 +1058,8 @@ class Boton:
     """Clase que representa un boton clickable"""
     def __init__(
             self, pos, origen=(0,0), texto=None, tamaño=BOTON_TAMANO_LETRA, imagen=None, ayuda=None, textura='gotele',
-            info=None, indice=None, accion=None, args=(), surface=g_pantalla, audio_sel='boton_sel', audio_pul='boton_pul'
+            info=None, indice=None, accion=None, args=(), surface=g_pantalla, audio_sel='boton_sel', audio_pul='boton_pul',
+            anchura=None, altura=None
         ):
         if not texto and not imagen:
             return
@@ -1029,6 +1075,8 @@ class Boton:
         self.audio_sel = audio_sel # Sonido que se reproduce al seleccionar el boton
         self.audio_pul = audio_pul # Sonido que se reproduce al pulsar el boton
         self.textura   = textura   # Textura a usar para el boton
+        self.anchura   = anchura   # Anchura mínima del botón
+        self.altura    = altura    # Altura mínima del botón
 
         # Calculamos el tamaño del boton
         if texto:
@@ -1038,8 +1086,16 @@ class Boton:
             self.imagen = g_fuentes[tamaño].render(texto, True, (0, 0, 0))
         else:
             self.imagen = imagen
-        x, y = self.imagen.get_size()
-        self.dim = (x + 5, y + 5) # Dimensiones del botón
+        x, y = self.tamaño = self.imagen.get_size()
+        if anchura and x + 5 < anchura:
+            x = anchura - 5
+        else:
+            self.anchura = x + 5
+        if altura and y + 5 < altura:
+            y = altura - 5
+        else:
+            self.altura = y + 5
+        self.dim = (x + 5, y + 5)
 
         # Otros elementos
         self.panel = Panel(self.pos, self.dim, None, BOTON_COLOR_NORMAL, surface=self.surface, origen=origen, textura=self.textura)
@@ -1092,7 +1148,7 @@ class Boton:
     def renderizar(self):
         """Volver a renderizar el contenido del boton. Solo hace falta hacerlo cuando ha cambiado."""
         self.panel.renderizar()
-        self.panel.lienzo.blit(self.imagen, (2, 2))
+        self.panel.lienzo.blit(self.imagen, ((self.anchura - self.tamaño[0]) / 2, (self.altura - self.tamaño[1]) / 2))
         if not self.indice:
             return
         fuente = g_fuentes[AYUDA_TAMANO]
