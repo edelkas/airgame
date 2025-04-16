@@ -53,9 +53,9 @@ FPS                             = 60        # Fotogramas por segundo
 COLOR_FONDO                     = "#cccccc" # Color RGB del fondo de pantalla
 
 # Configuraciones
-MUSICA_REPRODUCIR               = False     # Activar o desactivar la música por defecto
-MUSICA_VOLUMEN                  = 0.5       # Volumen relativo de la musica (0.0 - 1.0)
-SALTAR_PREPARACION              = True      # Saltar la primera fase, útil para testear
+MUSICA_REPRODUCIR  = False # Activar o desactivar la música por defecto
+MUSICA_VOLUMEN     = 0.5   # Volumen relativo de la musica (0.0 - 1.0)
+SALTAR_PREPARACION = True  # Saltar la primera fase, útil para testear
 
 # Carpetas de ficheros del juego
 CARPETA_AUDIO      = "audio" # Localización de los sonidos y música
@@ -822,6 +822,8 @@ class Informacion:
                              color = mensaje['color'], negrita = mensaje['negrita'], max_ancho = self.ANCHURA + 20 - mensaje['pos'][0])
         for boton in self.botones:
             boton.dibujar()
+
+        texto(f"{g_reloj.get_fps():.2f} fps", (x + w - 80, y + h - 20), 14, alineado_h='d')
 
     def resetear(self):
         """Reiniciar los contenidos del panel informativo"""
