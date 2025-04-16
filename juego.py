@@ -273,8 +273,12 @@ class Medio:
                     g_ayuda = f"Mejorar {cls.NOMBRE} ({cls.PRECIO_MEJORA}M)"
 
         # Texto informativo extenso en el panel inferior
-        nombres = "Descripción:"
-        valores = f"{cls.DESC}"
+        y0 = g_fuentes[Informacion.TAMANO_TITULO].get_linesize()
+        y1 = g_fuentes[Informacion.TAMANO_TEXTO].get_linesize()
+        g_info.escribir("Descripción:", (10, y0), negrita = True)
+        g_info.escribir(cls.DESC, (120, y0))
+        nombres = ""
+        valores = ""
         if cls.PRECIO:        nombres += "\nPrecio:";        valores += f"\n{cls.PRECIO}"
         if cls.PRECIO_MEJORA: nombres += "\nPrecio mejora:"; valores += f"\n{cls.PRECIO_MEJORA}"
         if cls.VELOCIDAD:     nombres += "\nVelocidad:";     valores += f"\n{cls.VELOCIDAD}"
@@ -286,8 +290,8 @@ class Medio:
         if cls.VIGILANCIA:    nombres += "\nVigilancia:";    valores += f"\n{cls.VIGILANCIA}"
         if cls.RADIOVIG:      nombres += "\nRadio-vigil.:";  valores += f"\n{cls.RADIOVIG}"
         if cls.SUPAEREA:      nombres += "\nSup.-aerea:";    valores += f"\n{cls.SUPAEREA}"
-        g_info.escribir(nombres, (10, 30),  negrita = True)
-        g_info.escribir(valores, (120, 30))
+        g_info.escribir(nombres, ( 10, y0 + 2 * y1), negrita = True)
+        g_info.escribir(valores, (120, y0 + 2 * y1))
 
 class MedioAereo(Medio):
     """Representa cualquier medio aéreo"""
@@ -724,10 +728,18 @@ class Escenario:
         self.casilla_pulsa = None # Casilla actualmente pulsada por el raton
 
 class Informacion:
+    TAMANO_TEXTO   = 14        # Tamaño de la fuente empleada en el panel
+    TAMANO_TITULO  = 24        # Tamaño de la fuente de los títulos grandes
+    MENSAJE_LIMITE = 10        # Limite de mensajes de error (o similares) en pantalla
+    COLOR_ERROR    = '#c00000' # Color del texto "Error"
+    COLOR_INFO     = '#0000c0' # Color del texto "Info"
+    ANCHURA        = 550       # Anchura en píxeles de la sección de información
+
     """Representa el panel informativo"""
     def __init__(self, panel):
         self.panel = panel
         self.textos = []
+        self.mensajes = []
         x, y, w, h = self.panel.rect
         self.botones = [
             Boton((0, 0), texto="Jugar",     anchura=80, accion=siguiente_jugador),
@@ -739,13 +751,23 @@ class Informacion:
         for i, b in enumerate(reversed(self.botones)):
             b.mover(x + w - b.dim[0], y + h - (i + 1) * b.dim[1])
 
-    def escribir(self, texto, pos, tamaño = 14, negrita = False):
+    def escribir(self, texto, pos, tamaño = 14, color = '#000000', negrita = False):
         """Cambiar el texto del panel"""
-        self.textos.append({ 'texto': texto, 'pos': pos, 'tamaño': tamaño, 'negrita': negrita })
+        self.textos.append({ 'texto': texto, 'pos': pos, 'tamaño': tamaño, 'color': color, 'negrita': negrita })
 
     def borrar(self):
         """Eliminar el texto del panel"""
         self.textos = []
+
+    def error(self, texto):
+        """Guardar un mensaje especial de error (una única línea)"""
+        del self.mensajes[self.MENSAJE_LIMITE - 1:]
+        self.mensajes.insert(0, ('error', texto))
+
+    def info(self, texto):
+        """Guardar un mensaje informativo (una única línea)"""
+        del self.mensajes[self.MENSAJE_LIMITE - 1:]
+        self.mensajes.insert(0, ('info', texto))
 
     def actualizar(self):
         """Actualizar los contenidos del panel"""
@@ -754,8 +776,11 @@ class Informacion:
 
     def dibujar(self):
         """Renderizar el texto en pantalla"""
+        # Panel base
         self.panel.dibujar()
         x, y, w, h = self.panel.rect
+
+        # Información general del juego
         nombres = "Fase:\nTurno:"
         valores = f"{g_fase}\nJugador {g_jugador.indice + 1}"
         if g_fase == 'Principal':
@@ -763,13 +788,29 @@ class Informacion:
             valores += "\n{g_paso}"
         texto_multilinea(nombres, (x + w - 150, y), 16, negrita = True)
         texto_multilinea(valores, (x + w - 100, y), 16)
-        for texto in self.textos:
-            texto_multilinea(texto['texto'], (x + texto['pos'][0], y + texto['pos'][1]), texto['tamaño'], negrita = texto['negrita'], max_ancho = w - texto['pos'][0])
+
+        # Mensajes emitidos
+        texto('Mensajes', (x + self.ANCHURA + 20, y), self.TAMANO_TITULO, subrayado = True)
+        dy0 = g_fuentes[self.TAMANO_TITULO].get_linesize()
+        dy = g_fuentes[self.TAMANO_TEXTO].get_linesize()
+        for i, (tipo, linea) in enumerate(self.mensajes):
+            color = { 'error': self.COLOR_ERROR, 'info': self.COLOR_INFO }[tipo]
+            cabecera = tipo.capitalize() + ':'
+            texto(cabecera, (x + self.ANCHURA + 20,      y + dy0 + i * dy), self.TAMANO_TEXTO, color = color, negrita = True)
+            texto(linea,    (x + self.ANCHURA + 70, y + dy0 + i * dy), self.TAMANO_TEXTO)
+
+        # Textos informativos
+        texto('Información', (x + 10, y), self.TAMANO_TITULO, subrayado = True)
+        for mensaje in self.textos:
+            texto_multilinea(mensaje['texto'], (x + mensaje['pos'][0], y + mensaje['pos'][1]), mensaje['tamaño'],
+                             color = mensaje['color'], negrita = mensaje['negrita'], max_ancho = self.ANCHURA + 20 - mensaje['pos'][0])
         for boton in self.botones:
             boton.dibujar()
 
     def resetear(self):
         """Reiniciar los contenidos del panel informativo"""
+        self.textos = []
+        self.mensajes = []
         for boton in self.botones:
             boton.resetear()
 
@@ -992,16 +1033,16 @@ class Jugador:
         infra = casilla.infraestructura
         if infra:
             if type(infra) is not producto: # Infraestructura de otro tipo -> Error
-                reproducir_sonido('error', 'interfaz')
+                emitir_error('Ya hay una infraestructura de otro tipo en esta casilla')
             elif g_fase != 'Preparación':   # Infraestructura del mismo tipo -> Mejorar
                 infra.mejorar()
             else:                           # No se puede mejorar en fase de preparación
-                reproducir_sonido('error', 'interfaz')
+                emitir_error('No se pueden mejorar infraestructuras en fase de preparación')
         else:                               # No hay infraestructura -> Construir
             if g_fase == 'Preparación':
                 cantidad = sum(1 for infra in self.infraestructuras if type(infra) is producto)
                 if cantidad >= producto.CANTIDAD:
-                    reproducir_sonido('error', 'interfaz')
+                    emitir_error(f"Ya has construido todas las {producto.NOMBRE.lower()} iniciales")
                     return
             elif not self.pagar(producto.PRECIO):
                 return
@@ -1013,7 +1054,7 @@ class Jugador:
     def pagar(self, cantidad):
         """Desembolsar una cierta cantidad, si hay crédito disponible"""
         if self.credito < cantidad:
-            reproducir_sonido('error', 'interfaz')
+            emitir_error('No tienes crédito suficiente!')
             return False
         reproducir_sonido('pagar', 'efectos')
         self.credito -= cantidad
@@ -1075,7 +1116,7 @@ class Tienda:
         for medio in self.MEDIOS:
             boton = self.botones[medio]
             if g_fase == 'Preparación':
-                boton.bloquear()
+                boton.bloquear('No se pueden comprar medios en fase de preparación')
             else:
                 boton.desbloquear()
             boton.indexar(sum(1 for producto in g_jugador.medios if type(producto) is medio))
@@ -1182,27 +1223,28 @@ class Boton:
     def __init__(
             self, pos, origen=(0,0), texto=None, tamaño=BOTON_TAMANO_LETRA, imagen=None, textura='gotele',
             info=None, indice=None, accion=None, args=(), surface=g_pantalla, audio_sel='boton_sel', audio_pul='boton_pul',
-            anchura=None, altura=None, bloqueado=False, visible=True
+            anchura=None, altura=None, bloqueado=False, block_razon=None, visible=True
         ):
         if not texto and not imagen:
             return
-        self.pos        = pos       # Posición del botón en pantalla
-        self.texto      = None      # Texto del boton
-        self.imagen     = None      # Imagen del boton
-        self.info       = info      # Función a ejecutar si el botón es seleccionado
-        self.accion     = accion    # Función a ejecutar si el botón es pulsado
-        self.args       = args      # Argumentos que mandar a la función acción, si son necesarios
-        self.surface    = surface   # Superficie sobre la que se renderiza en boton
-        self.indice     = indice    # Pequeño número que aparezca en la esquina del botón
-        self.audio_sel  = audio_sel # Sonido que se reproduce al seleccionar el boton
-        self.audio_pul  = audio_pul # Sonido que se reproduce al pulsar el boton
-        self.textura    = textura   # Textura a usar para el boton
-        self.anchura    = anchura   # Anchura mínima del botón
-        self.altura     = altura    # Altura mínima del botón
-        self.block_orig = bloqueado # Un botón bloqueado no puede usarse. Copia del valor original, que puede cambiar.
-        self.visible    = visible   # Un botón no visible no se actualiza ni dibuja
-        self.selec      = False     # Verdadero si el ratón está encima del botón
-        self.pulsado    = False     # Verdadero si el botón está siendo pulsado
+        self.pos         = pos         # Posición del botón en pantalla
+        self.texto       = None        # Texto del boton
+        self.imagen      = None        # Imagen del boton
+        self.info        = info        # Función a ejecutar si el botón es seleccionado
+        self.accion      = accion      # Función a ejecutar si el botón es pulsado
+        self.args        = args        # Argumentos que mandar a la función acción, si son necesarios
+        self.surface     = surface     # Superficie sobre la que se renderiza en boton
+        self.indice      = indice      # Pequeño número que aparezca en la esquina del botón
+        self.audio_sel   = audio_sel   # Sonido que se reproduce al seleccionar el boton
+        self.audio_pul   = audio_pul   # Sonido que se reproduce al pulsar el boton
+        self.textura     = textura     # Textura a usar para el boton
+        self.anchura     = anchura     # Anchura mínima del botón
+        self.altura      = altura      # Altura mínima del botón
+        self.block_orig  = bloqueado   # Un botón bloqueado no puede usarse. Copia del valor original, que puede cambiar.
+        self.block_razon = block_razon # Razón por la cual el botón está bloqueado
+        self.visible     = visible     # Un botón no visible no se actualiza ni dibuja
+        self.selec       = False       # Verdadero si el ratón está encima del botón
+        self.pulsado     = False       # Verdadero si el botón está siendo pulsado
 
         # Calculamos el tamaño del boton
         if texto:
@@ -1233,13 +1275,15 @@ class Boton:
         self.panel.mover(dx, dy)
         self.pos = (self.pos[0] + dx, self.pos[1] + dy)
 
-    def bloquear(self):
+    def bloquear(self, razon = None):
         """Bloquear el boton para impedir que pueda usarse"""
         self.block = True
+        self.block_razon = razon
 
     def desbloquear(self):
         """Desbloquear el boton para que pueda volver a usarse"""
         self.block = False
+        self.block_razon = None
 
     def mostrar(self):
         """Hacer el botón visible"""
@@ -1273,7 +1317,7 @@ class Boton:
         if not pulsado_antes and self.pulsado and self.audio_pul:
             reproducir_sonido(self.audio_pul, 'interfaz')
         if self.pulsado and self.block:
-            reproducir_sonido('error', 'interfaz')
+            emitir_error(self.block_razon)
 
         # Actualizar color y renderizar boton
         if self.pulsado:
@@ -1443,6 +1487,12 @@ def texto_multilinea(
         y += fuente.get_linesize()
     return pagina < paginas - 1
 
+def emitir_error(texto = None):
+    """Emitir un mensaje y sonido de error"""
+    if texto:
+        g_info.error(texto)
+    reproducir_sonido('error', 'interfaz')
+
 # < -------------------------------------------------------------------------- >
 #                       ACTUALIZACION DEL ESTADO DEL JUEGO
 # < -------------------------------------------------------------------------- >
@@ -1472,6 +1522,7 @@ def siguiente_jugador():
         g_jugador = g_jugadores[0]
     else:
         g_jugador = g_jugadores[(g_jugador.indice + 1) % 2]
+    g_info.info(f"Turno del jugador {g_jugador.indice + 1}")
 
 def siguiente_fase():
     """Avanzar a la siguiente fase del juego"""
@@ -1623,7 +1674,7 @@ sep = PANEL_SEPARACION
 paneles = {
     'escenario':   Panel((sep, sep), (ANCHURA * ANCHURA_JUEGO - 1.5 * sep, ALTURA * ALTURA_JUEGO - 1.5 * sep), textura='hierba'),
     'tienda':      Panel((ANCHURA * ANCHURA_JUEGO + sep / 2, sep), (ANCHURA * ANCHURA_ACCIONES - 1.5 * sep, ALTURA * ALTURA_ACCIONES - 1.5 * sep), textura='ladrillos'),
-    'informacion': Panel((sep, ALTURA * ALTURA_JUEGO + sep / 2), (ANCHURA - 2 * sep, ALTURA * ALTURA_INFORMACION - 1.5 * sep), 'información', textura='piedras')
+    'informacion': Panel((sep, ALTURA * ALTURA_JUEGO + sep / 2), (ANCHURA - 2 * sep, ALTURA * ALTURA_INFORMACION - 1.5 * sep), textura='piedras')
 }
 
 # Inicializar algunas variables globales (no cambiar estas líneas de orden)
