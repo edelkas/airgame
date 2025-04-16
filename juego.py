@@ -301,8 +301,8 @@ class Medio:
         if cls.VIGILANCIA:    nombres += "\nVigilancia:";    valores += f"\n{cls.VIGILANCIA}"
         if cls.RADIOVIG:      nombres += "\nRadio-vigil.:";  valores += f"\n{cls.RADIOVIG}"
         if cls.SUPAEREA:      nombres += "\nSup.-aerea:";    valores += f"\n{cls.SUPAEREA}"
-        g_info.escribir(nombres, ( 10, y0 + 2 * y1), negrita = True)
-        g_info.escribir(valores, (120, y0 + 2 * y1))
+        g_info.escribir(nombres, ( 10, y0 + 1 * y1), negrita = True)
+        g_info.escribir(valores, (120, y0 + 1 * y1))
 
 class MedioAereo(Medio):
     """Representa cualquier medio aéreo"""
@@ -1036,6 +1036,7 @@ class Jugador:
         self.medios           = []
         self.infraestructuras = []
         self.credito          = CREDITO_INICIAL
+        self.preparado        = False
 
     def comprar(self, producto):
         """Adquirir un medio y añadirlo al inventario"""
@@ -1094,7 +1095,7 @@ class Tienda:
     BOTON_SEP = 5
     TAM_FUENTE = 24
     MEDIOS = [AvionCaza, AvionAtaque, AvionTransporte, Helicoptero, Dron, Radar, Bateria, Inteligencia]
-    INFRAESTRUCTURAS = [Ciudad, Base]
+    INFRAESTRUCTURAS = [Ciudad, Base, Capital]
 
     def __init__(self, panel):
         self.panel = panel
@@ -1104,14 +1105,20 @@ class Tienda:
         cols = 2
         linea = g_fuentes[self.TAM_FUENTE].get_linesize()
         x = ANCHURA * ANCHURA_JUEGO + 20
-        y = 2 * (PANEL_SEPARACION + linea)
-        for i, producto in enumerate(self.MEDIOS + self.INFRAESTRUCTURAS):
+        y = 2 * (PANEL_SEPARACION + linea) - 5
+        for i, producto in enumerate(self.MEDIOS + self.INFRAESTRUCTURAS[:2]):
             boton = self.crear_boton(producto)
             self.botones[producto] = boton
             boton.mover(x, y)
             dx, dy = boton.dim
             x += dx + self.BOTON_SEP if i % cols  < cols - 1 else -(dx + self.BOTON_SEP) * (cols - 1)
             y += dy + self.BOTON_SEP if i % cols == cols - 1 else 0
+
+        # El botón de la capital es especial
+        self.botones[Capital] = Boton(
+            (x, y), texto="Capital", info=Capital.info, indice=0, accion=lambda: g_jugador.construir(Capital, g_escenario.casilla_pulsa),
+            audio_pul=None, anchura=2 * dx + self.BOTON_SEP, textura=None, negrita=True, color='#ffffff', color_selec='#ffffff', color_pulsado='#ffffff'
+        )
 
     def crear_boton(self, producto):
         """Crear cada uno de los botones de la tienda"""
@@ -1120,10 +1127,8 @@ class Tienda:
         if producto in self.MEDIOS:
             accion = lambda p: g_jugador.comprar(p)
             args = (producto,)
-        elif producto is Ciudad:
-            accion = lambda: g_jugador.construir(Ciudad, g_escenario.casilla_pulsa)
-        elif producto is Base:
-            accion = lambda: g_jugador.construir(Base, g_escenario.casilla_pulsa)
+        else:
+            accion = lambda: g_jugador.construir(producto, g_escenario.casilla_pulsa)
         return Boton((0, 0), imagen=producto.ICONO, info=producto.info, indice=0, accion=accion, args=args, audio_pul=None)
 
     def actualizar(self):
@@ -1145,12 +1150,6 @@ class Tienda:
         for infra in self.INFRAESTRUCTURAS:
             boton = self.botones[infra]
             boton.visible = visibles
-            if casilla and type(casilla.infraestructura) is infra and casilla.infraestructura.jugador == g_jugador:
-                pass
-                #boton.ayuda = f"Mejorar {infra.NOMBRE} ({infra.PRECIO_MEJORA}M)"
-            else:
-                pass
-                #boton.ayuda = f"{infra.NOMBRE} ({infra.PRECIO}M)"
             boton.indexar(sum(1 for producto in g_jugador.infraestructuras if type(producto) is infra))
             boton.actualizar()
 
@@ -1158,8 +1157,8 @@ class Tienda:
         """Renderizar la tienda en pantalla"""
         self.panel.dibujar()
         linea = g_fuentes[self.TAM_FUENTE].get_linesize()
-        texto(f"Crédito: {g_jugador.credito}M", (ANCHURA * ANCHURA_JUEGO + PANEL_SEPARACION, PANEL_SEPARACION), tamaño=self.TAM_FUENTE)
-        texto('Tienda', (ANCHURA * (ANCHURA_JUEGO + 1) / 2, PANEL_SEPARACION + linea), tamaño=self.TAM_FUENTE, alineado_h='c', subrayado=True)
+        texto(f"Dinero: {g_jugador.credito}", (ANCHURA * ANCHURA_JUEGO + PANEL_SEPARACION, PANEL_SEPARACION), tamaño=self.TAM_FUENTE)
+        texto('Tienda', (ANCHURA * (ANCHURA_JUEGO + 1) / 2, PANEL_SEPARACION + linea - 5), tamaño=self.TAM_FUENTE, alineado_h='c', subrayado=True)
         for boton in self.botones.values():
             boton.dibujar()
 
@@ -1240,35 +1239,42 @@ class Boton:
     def __init__(
             self, pos, origen=(0,0), texto=None, tamaño=BOTON_TAMANO_LETRA, imagen=None, textura='gotele',
             info=None, indice=None, accion=None, args=(), surface=g_pantalla, audio_sel='boton_sel', audio_pul='boton_pul',
-            anchura=None, altura=None, bloqueado=False, block_razon=None, visible=True
+            anchura=None, altura=None, bloqueado=False, block_razon=None, visible=True, negrita=False,
+            color=BOTON_COLOR_NORMAL, color_selec=BOTON_COLOR_SOBRE, color_pulsado=BOTON_COLOR_PULSA
         ):
         if not texto and not imagen:
             return
-        self.pos         = pos         # Posición del botón en pantalla
-        self.texto       = None        # Texto del boton
-        self.imagen      = None        # Imagen del boton
-        self.info        = info        # Función a ejecutar si el botón es seleccionado
-        self.accion      = accion      # Función a ejecutar si el botón es pulsado
-        self.args        = args        # Argumentos que mandar a la función acción, si son necesarios
-        self.surface     = surface     # Superficie sobre la que se renderiza en boton
-        self.indice      = indice      # Pequeño número que aparezca en la esquina del botón
-        self.audio_sel   = audio_sel   # Sonido que se reproduce al seleccionar el boton
-        self.audio_pul   = audio_pul   # Sonido que se reproduce al pulsar el boton
-        self.textura     = textura     # Textura a usar para el boton
-        self.anchura     = anchura     # Anchura mínima del botón
-        self.altura      = altura      # Altura mínima del botón
-        self.block_orig  = bloqueado   # Un botón bloqueado no puede usarse. Copia del valor original, que puede cambiar.
-        self.block_razon = block_razon # Razón por la cual el botón está bloqueado
-        self.visible     = visible     # Un botón no visible no se actualiza ni dibuja
-        self.selec       = False       # Verdadero si el ratón está encima del botón
-        self.pulsado     = False       # Verdadero si el botón está siendo pulsado
+        self.pos           = pos           # Posición del botón en pantalla
+        self.texto         = None          # Texto del boton
+        self.imagen        = None          # Imagen del boton
+        self.info          = info          # Función a ejecutar si el botón es seleccionado
+        self.accion        = accion        # Función a ejecutar si el botón es pulsado
+        self.args          = args          # Argumentos que mandar a la función acción, si son necesarios
+        self.surface       = surface       # Superficie sobre la que se renderiza en boton
+        self.indice        = indice        # Pequeño número que aparezca en la esquina del botón
+        self.audio_sel     = audio_sel     # Sonido que se reproduce al seleccionar el boton
+        self.audio_pul     = audio_pul     # Sonido que se reproduce al pulsar el boton
+        self.textura       = textura       # Textura a usar para el boton
+        self.anchura       = anchura       # Anchura mínima del botón
+        self.altura        = altura        # Altura mínima del botón
+        self.block_orig    = bloqueado     # Un botón bloqueado no puede usarse. Copia del valor original, que puede cambiar.
+        self.block_razon   = block_razon   # Razón por la cual el botón está bloqueado
+        self.visible       = visible       # Un botón no visible no se actualiza ni dibuja
+        self.selec         = False         # Verdadero si el ratón está encima del botón
+        self.pulsado       = False         # Verdadero si el botón está siendo pulsado
+        self.color         = color         # Color normal del botón
+        self.color_selec   = color_selec   # Color del botón cuando el ratón está sobre él
+        self.color_pulsado = color_pulsado # Color del botón cuando es pulsado
 
         # Calculamos el tamaño del boton
         if texto:
             if not tamaño in TEXTO_TAMANOS:
                 tamaño = BOTON_TAMANO_LETRA
             self.texto = texto
+            negrita_original = g_fuentes[tamaño].bold
+            g_fuentes[tamaño].bold = negrita
             self.imagen = g_fuentes[tamaño].render(texto, True, (0, 0, 0))
+            g_fuentes[tamaño].bold = negrita_original
         else:
             self.imagen = imagen
         x, y = self.tamaño = self.imagen.get_size()
@@ -1283,7 +1289,7 @@ class Boton:
         self.dim = (x + 5, y + 5)
 
         # Otros elementos
-        self.panel = Panel(self.pos, self.dim, None, BOTON_COLOR_NORMAL, surface=self.surface, origen=origen, textura=self.textura)
+        self.panel = Panel(self.pos, self.dim, None, self.color, surface=self.surface, origen=origen, textura=self.textura)
 
         self.resetear()
 
@@ -1338,11 +1344,11 @@ class Boton:
 
         # Actualizar color y renderizar boton
         if self.pulsado:
-            self.panel.color = BOTON_COLOR_PULSA
+            self.panel.color = self.color_pulsado
         elif self.selec:
-            self.panel.color = BOTON_COLOR_SOBRE
+            self.panel.color = self.color_selec
         else:
-            self.panel.color = BOTON_COLOR_NORMAL
+            self.panel.color = self.color
         if cambio:
             self.renderizar()
 
@@ -1534,6 +1540,8 @@ def siguiente_fotograma():
 
 def siguiente_jugador():
     """Cambiar de turno"""
+    if not verificar_turno():
+        return
     global g_jugador
     if not g_jugador:
         g_jugador = g_jugadores[0]
@@ -1546,7 +1554,7 @@ def siguiente_fase():
     global g_fase
     indice = g_fases.index(g_fase)
     if indice < len(g_fases) - 1:
-        g_fase = g_fases[indice + 1]
+        cambiar_fase(g_fases[indice + 1])
     else:
         resetear_fase()
 
@@ -1555,6 +1563,8 @@ def cambiar_fase(nombre):
     global g_fase
     if nombre in g_fases:
         g_fase = nombre
+        if g_fase not in ['Pantallazo', 'Reglas']:
+            g_info.info(f'Iniciada fase "{nombre}"')
         return True
     return False
 
@@ -1666,6 +1676,18 @@ def actualizar_paso_despliegue():
     """Desarrollar el paso de despliegue. El jugador moviliza aeronaves en alguna casilla."""
     pass
 
+def verificar_turno():
+    """Comprobar que el jugador ha realizado un turno válido y podemos pasar al siguiente"""
+    if g_fase == "Preparación":
+        cantidades = { Capital: 0, Ciudad: 0, Base: 0 }
+        for infra in g_jugador.infraestructuras:
+            cantidades[type(infra)] += 1
+        if cantidades[Capital] < Capital.CANTIDAD or cantidades[Ciudad] < Ciudad.CANTIDAD or cantidades[Base] < Base.CANTIDAD:
+            emitir_error(f"Necesitas {Capital.CANTIDAD} capital, {Ciudad.CANTIDAD} ciudades y {Base.CANTIDAD} bases aéreas.")
+            return False
+        g_jugador.preparado = True
+        return True
+
 def resetear():
     g_reglas.resetear()
     g_escenario.resetear()
@@ -1704,9 +1726,9 @@ g_tienda    = Tienda(paneles['tienda'])             # Tienda de productos
 
 # Fases y pasos del juego. Los pasos son las distintas etapas en las que se divide un turno.
 g_fases = ['Pantallazo', 'Reglas', 'Preparación', 'Principal', 'Final']
-g_fase = g_fases[0]
+g_fase  = cambiar_fase('Pantallazo')
 g_pasos = ['Reporte', 'Inteligencia', 'Ingresos', 'Recursos', 'Ataque', 'Despliegue']
-g_paso = g_pasos[0]
+g_paso  = None
 
 # Configuracion
 g_config = {
@@ -1738,17 +1760,21 @@ while True:
     actualizar_fondo()     # Colorear fondo
 
     # Ejecutar cada fase del juego
-    if g_fase == 'Pantallazo':                        # Pantallazo inicial
+    if g_fase == 'Pantallazo':            # Pantallazo inicial
         actualizar_fase_pantallazo()
         if g_click:
             siguiente_fase()
-    elif g_fase == 'Reglas':                          # Pantallazo de reglas
+    elif g_fase == 'Reglas':              # Pantallazo de reglas
         actualizar_fase_reglas()
         if not g_reglas.visible:
             siguiente_fase()
-    elif g_fase in ['Preparación', 'Principal']:         # Fase central del juego
+    elif g_fase == 'Preparación':         # Fase preparativa inicial
+        actualizar_fase_principal()
+        if sum(1 for jugador in g_jugadores if jugador.preparado) == 2:
+            siguiente_fase()
+    elif g_fase == 'Principal':           # Fase central del juego
         actualizar_fase_principal()
     else:
-        pass
+        cambiar_fase('Pantallazo')
 
     siguiente_fotograma()
