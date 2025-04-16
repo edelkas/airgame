@@ -450,8 +450,9 @@ class Infraestructura(MedioEstrategico):
 
     def cosechar(self):
         """Obtener el bonus económico que otorga la infraestructura"""
-        self.jugador.cobrar(self.BONUS * self.nivel)
-        return self.BONUS > 0
+        cantidad = self.BONUS * self.nivel
+        self.jugador.cobrar(cantidad)
+        return cantidad
 
 class Ciudad(Infraestructura):
     """Infraestructura que otorga recursos al jugador"""
@@ -541,11 +542,11 @@ class Casilla:
         """Otorgar bonus de crédito al jugador"""
         if self.hay_supremacia():
             self.jugador.cobrar(self.BONUS_F)
-            return True
+            return self.BONUS_F
         elif self.hay_superioridad():
             self.jugador.cobrar(self.BONUS)
-            return True
-        return False
+            return self.BONUS
+        return 0
 
     def destruir(self):
         """Destruir la infraestructura de la casilla"""
@@ -723,11 +724,7 @@ class Escenario:
 
     def cosechar(self):
         """Adquirir crédito adicional debido a las casillas con superioridad aérea"""
-        cosechado = False
-        for columna in self.casillas:
-            for casilla in columna:
-                cosechado = cosechado or casilla.cosechar()
-        return cosechado
+        return sum(casilla.cosechar() for columna in self.casillas for casilla in columna)
 
     def resetear(self):
         """Resetear los contenidos de todas las celdas"""
@@ -744,6 +741,7 @@ class Informacion:
     MENSAJE_LIMITE = 10        # Limite de mensajes de error (o similares) en pantalla
     COLOR_ERROR    = '#c00000' # Color del texto "Error"
     COLOR_INFO     = '#0000c0' # Color del texto "Info"
+    COLOR_DINERO   = '#c0c000' # Color del texto "Dinero"
     ANCHURA        = 550       # Anchura en píxeles de la sección de información
 
     """Representa el panel informativo"""
@@ -770,18 +768,25 @@ class Informacion:
         """Eliminar el texto del panel"""
         self.textos = []
 
+    def añadir_mensaje(self, tipo, texto):
+        """Añadir un mensaje al panel"""
+        self.mensajes.insert(0, (tipo, texto))
+
     def error(self, texto):
         """Guardar un mensaje especial de error (una única línea)"""
-        del self.mensajes[self.MENSAJE_LIMITE - 1:]
-        self.mensajes.insert(0, ('error', texto))
+        self.añadir_mensaje('error', texto)
 
     def info(self, texto):
         """Guardar un mensaje informativo (una única línea)"""
-        del self.mensajes[self.MENSAJE_LIMITE - 1:]
-        self.mensajes.insert(0, ('info', texto))
+        self.añadir_mensaje('info', texto)
+
+    def dinero(self, texto):
+        """Guardar un mensaje relativo al dinero del jugador"""
+        self.añadir_mensaje('dinero', texto)
 
     def actualizar(self):
         """Actualizar los contenidos del panel"""
+        del self.mensajes[self.MENSAJE_LIMITE - 1:]
         for boton in self.botones:
             boton.actualizar()
 
@@ -805,7 +810,7 @@ class Informacion:
         dy0 = g_fuentes[self.TAMANO_TITULO].get_linesize()
         dy = g_fuentes[self.TAMANO_TEXTO].get_linesize()
         for i, (tipo, linea) in enumerate(self.mensajes):
-            color = { 'error': self.COLOR_ERROR, 'info': self.COLOR_INFO }[tipo]
+            color = { 'error': self.COLOR_ERROR, 'info': self.COLOR_INFO, 'dinero': self.COLOR_DINERO }[tipo]
             cabecera = tipo.capitalize() + ':'
             texto(cabecera, (x + self.ANCHURA + 20,      y + dy0 + i * dy), self.TAMANO_TEXTO, color = color, negrita = True)
             texto(linea,    (x + self.ANCHURA + 70, y + dy0 + i * dy), self.TAMANO_TEXTO)
@@ -1079,7 +1084,8 @@ class Jugador:
         """Adquirir crédito adicional debido a la superioridad aérea y las infraestructuras"""
         cosechado = g_escenario.cosechar()
         for infra in self.infraestructuras:
-            cosechado = cosechado or infra.cosechar()
+            cosechado += infra.cosechar()
+        g_info.dinero(f"Has cosechado {cosechado}M€")
         if cosechado:
             reproducir_sonido('cobrar', 'efectos')
 
