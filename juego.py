@@ -103,6 +103,17 @@ SONIDO_PUERTA_ABRE   = 'puerta_abre.ogg'
 SONIDO_PUERTA_CIERRA = 'puerta_cierra.ogg'
 SONIDO_CONSTRUIR     = 'maquina.ogg'
 
+ICONO_AVIONCAZA       = 'icono_caza.png'
+ICONO_AVIONATAQUE     = 'icono_ataque.png'
+ICONO_AVIONTRANSPORTE = 'icono_transporte.png'
+ICONO_HELICOPTERO     = 'icono_helicoptero.png'
+ICONO_DRON            = 'icono_dron.png'
+ICONO_RADAR           = 'icono_radar.png'
+ICONO_BATERIA         = 'icono_bateria.png'
+ICONO_INTELIGENCIA    = 'icono_inteligencia.png'
+ICONO_CIUDAD          = 'icono_ciudad.png'
+ICONO_BASE            = 'icono_base.png'
+
 TEXTURA_ESCENARIO  = 'textura_hierba.png'
 TEXTURA_TIENDA     = 'textura_ladrillos.png'
 TEXTURA_INFO       = 'textura_piedras.png'
@@ -195,16 +206,16 @@ g_pantallazo = cargar_imagen(IMAGEN_FONDO)
 g_fuentes = { tam: pygame.font.SysFont(TEXTO_FUENTE, tam) for tam in TEXTO_TAMANOS }
 g_fuentes_mono = { tam: pygame.font.SysFont(TEXTO_FUENTE_MONO, tam) for tam in TEXTO_TAMANOS }
 g_iconos = {
-    'AvionCaza':       cargar_imagen('icono_caza.png'),
-    'AvionAtaque':     cargar_imagen('icono_ataque.png'),
-    'AvionTransporte': cargar_imagen('icono_transporte.png'),
-    'Helicoptero':     cargar_imagen('icono_helicoptero.png'),
-    'Dron':            cargar_imagen('icono_dron.png'),
-    'Radar':           cargar_imagen('icono_radar.png'),
-    'Bateria':         cargar_imagen('icono_bateria.png'),
-    'Inteligencia':    cargar_imagen('icono_inteligencia.png'),
-    'Ciudad':          cargar_imagen('icono_ciudad.png'),
-    'Base':            cargar_imagen('icono_base.png')
+    'AvionCaza':       cargar_imagen(ICONO_AVIONCAZA),
+    'AvionAtaque':     cargar_imagen(ICONO_AVIONATAQUE),
+    'AvionTransporte': cargar_imagen(ICONO_AVIONTRANSPORTE),
+    'Helicoptero':     cargar_imagen(ICONO_HELICOPTERO),
+    'Dron':            cargar_imagen(ICONO_DRON),
+    'Radar':           cargar_imagen(ICONO_RADAR),
+    'Bateria':         cargar_imagen(ICONO_BATERIA),
+    'Inteligencia':    cargar_imagen(ICONO_INTELIGENCIA),
+    'Ciudad':          cargar_imagen(ICONO_CIUDAD),
+    'Base':            cargar_imagen(ICONO_BASE)
 }
 g_sonidos = {
     'pagar':         cargar_sonido(SONIDO_PAGAR),
