@@ -713,8 +713,14 @@ class Escenario:
 
     def dibujar(self):
         """Dibujar todo el contenido del escenario en pantalla"""
-        # Panel de fondo
+        # Panel de fondo e indicador de turno
         self.panel.dibujar()
+        color = MAPA_COLOR_J1_F if g_jugador.indice == 0 else MAPA_COLOR_J2_F
+        x = Escenario.ORIGEN_X + Casilla.DIM_X * ((MAPA_DIM_X + 1.25) * g_jugador.indice - 1)
+        y = Escenario.ORIGEN_Y + MAPA_DIM_Y * Casilla.DIM_Y / 2 - 50
+        rect = (x, y, 10, 100)
+        pygame.draw.rect(self.panel.surface, color, rect, 0, 5)
+        pygame.draw.rect(self.panel.surface, '#000000', rect, 1, 5)
 
         # Mapa de celdas
         for columna in self.casillas:
@@ -1704,7 +1710,7 @@ def verificar_turno():
             emitir_error(f"Necesitas {Capital.CANTIDAD} capital, {Ciudad.CANTIDAD} ciudades y {Base.CANTIDAD} bases aéreas.")
             return False
         g_jugador.preparado = True
-        return True
+    return True
 
 def resetear():
     g_reglas.resetear()
