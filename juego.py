@@ -51,8 +51,11 @@ PANTALLA_COMPLETA               = False     # Para abrir el juego en ventana com
 PANTALLA_MODIFICARDIMENSION     = False     # Para poder modificar la dimensión de la ventana
 FPS                             = 60        # Fotogramas por segundo
 COLOR_FONDO                     = "#cccccc" # Color RGB del fondo de pantalla
+
+# Configuraciones
 MUSICA_REPRODUCIR               = False     # Activar o desactivar la música por defecto
 MUSICA_VOLUMEN                  = 0.5       # Volumen relativo de la musica (0.0 - 1.0)
+SALTAR_PREPARACION              = True      # Saltar la primera fase, útil para testear
 
 # Carpetas de ficheros del juego
 CARPETA_AUDIO      = "audio" # Localización de los sonidos y música
@@ -799,9 +802,6 @@ class Informacion:
         # Información general del juego
         nombres = "Fase:\nTurno:"
         valores = f"{g_fase}\nJugador {g_jugador.indice + 1}"
-        if g_fase == 'Principal':
-            nombres += "\nPaso:"
-            valores += "\n{g_paso}"
         texto_multilinea(nombres, (x + w - 150, y), 16, negrita = True)
         texto_multilinea(valores, (x + w - 100, y), 16)
 
@@ -1089,6 +1089,14 @@ class Jugador:
         g_info.dinero(f"Has cosechado {cosechado}M€")
         if cosechado:
             reproducir_sonido('cobrar', 'efectos')
+
+    def preparar(self):
+        """Realizar automáticamente la fase de preparación. Esta función está simplemente para facilitar el testeo."""
+        for producto in Tienda.INFRAESTRUCTURAS:
+            casillas = [casilla for columna in g_escenario.casillas for casilla in columna if casilla.hay_supremacia() and not casilla.infraestructura]
+            for casilla in random.sample(casillas, producto.CANTIDAD):
+                self.construir(producto, casilla)
+        self.preparado = True
 
 class Tienda:
     """Contiene todos los productos que se pueden adquirir y se encarga de su funcionalidad y renderizado"""
@@ -1540,13 +1548,13 @@ def siguiente_fotograma():
 
 def siguiente_jugador():
     """Cambiar de turno"""
-    if not verificar_turno():
-        return
     global g_jugador
     if not g_jugador:
         g_jugador = g_jugadores[0]
-    else:
+    elif verificar_turno():
         g_jugador = g_jugadores[(g_jugador.indice + 1) % 2]
+    else:
+        return
     g_info.info(f"Turno del jugador {g_jugador.indice + 1}")
 
 def siguiente_fase():
@@ -1615,6 +1623,14 @@ def actualizar_fase_reglas():
 def actualizar_fase_principal():
     """Actualizar estado en la fase de turnos"""
     visible = not g_reglas.visible
+    if not g_jugador:
+        siguiente_jugador()
+
+    # Saltar la fase preparatoria, para testear
+    if g_fase == 'Preparación' and SALTAR_PREPARACION:
+        g_jugador.preparar()
+        siguiente_jugador()
+        return
 
     # Actualizar estado sólo si el escenario es visible
     if visible:
@@ -1718,7 +1734,7 @@ paneles = {
 
 # Inicializar algunas variables globales (no cambiar estas líneas de orden)
 g_jugadores = [Jugador() for _ in range(2)]         # Lista de jugadores
-g_jugador   = g_jugadores[0]                        # Jugador actual
+g_jugador   = None                                  # Jugador actual
 g_reglas    = Reglamento()                          # Paginador de reglas
 g_escenario = Escenario(paneles['escenario'])       # Casillas del mapa y su contenido
 g_info      = Informacion(paneles['informacion'])   # Panel informativo inferior
