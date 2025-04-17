@@ -289,6 +289,7 @@ class Medio:
         # Texto informativo extenso en el panel inferior
         y0 = g_fuentes[Informacion.TAMANO_TITULO].get_linesize()
         y1 = g_fuentes[Informacion.TAMANO_TEXTO].get_linesize()
+        g_info.borrar()
         g_info.escribir("Descripción:", (10, y0), negrita = True)
         g_info.escribir(cls.DESC, (120, y0))
         nombres = ""
@@ -759,27 +760,32 @@ class Informacion:
         self.textos = []
         self.mensajes = []
         x, y, w, h = self.panel.rect
+        self.cambio = False
         self.botones = [
-            Boton((0, 0), texto="Jugar",     anchura=80, accion=siguiente_jugador),
-            Boton((0, 0), texto="Música",    anchura=80, accion=cambiar_musica),
-            Boton((0, 0), texto="Reglas",    anchura=80, accion=g_reglas.mostrar, audio_pul='puerta_abre'),
-            Boton((0, 0), texto="Reiniciar", anchura=80, accion=resetear),
-            Boton((0, 0), texto="Salir",     anchura=80, accion=salir)
+            Boton((0,0), texto="Jugar",     anchura=80, surface=self.panel.lienzo, origen=(x,y), accion=siguiente_jugador),
+            Boton((0,0), texto="Música",    anchura=80, surface=self.panel.lienzo, origen=(x,y), accion=cambiar_musica),
+            Boton((0,0), texto="Reglas",    anchura=80, surface=self.panel.lienzo, origen=(x,y), accion=g_reglas.mostrar, audio_pul='puerta_abre'),
+            Boton((0,0), texto="Reiniciar", anchura=80, surface=self.panel.lienzo, origen=(x,y), accion=resetear),
+            Boton((0,0), texto="Salir",     anchura=80, surface=self.panel.lienzo, origen=(x,y), accion=salir)
         ]
         for i, b in enumerate(reversed(self.botones)):
-            b.mover(x + w - b.dim[0], y + h - (i + 1) * b.dim[1])
+            b.mover(w - b.dim[0], h - (i + 1) * b.dim[1])
 
     def escribir(self, texto, pos, tamaño = 14, color = '#000000', negrita = False):
         """Cambiar el texto del panel"""
         self.textos.append({ 'texto': texto, 'pos': pos, 'tamaño': tamaño, 'color': color, 'negrita': negrita })
+        self.cambio = True
 
     def borrar(self):
         """Eliminar el texto del panel"""
-        self.textos = []
+        if self.textos:
+            self.textos = []
+            self.cambio = True
 
     def añadir_mensaje(self, tipo, texto):
         """Añadir un mensaje al panel"""
         self.mensajes.insert(0, (tipo, texto))
+        self.cambio = True
 
     def error(self, texto):
         """Guardar un mensaje especial de error (una única línea)"""
@@ -794,49 +800,58 @@ class Informacion:
         self.añadir_mensaje('dinero', texto)
 
     def actualizar(self):
-        """Actualizar los contenidos del panel"""
+        """Actualizar los contenidos del panel. Llamar cada fotograma."""
         del self.mensajes[self.MENSAJE_LIMITE - 1:]
         for boton in self.botones:
-            boton.actualizar()
+            self.cambio = self.cambio or boton.actualizar()
+        if self.cambio:
+            self.renderizar()
+        self.cambio = False
 
-    def dibujar(self):
-        """Renderizar el texto en pantalla"""
+    def renderizar(self):
+        """Renderizar el panel de información. Sólo hay que hacerlo cada vez que su contenido cambie."""
         # Panel base
-        self.panel.dibujar()
+        self.panel.renderizar()
         x, y, w, h = self.panel.rect
 
         # Información general del juego
         nombres = "Fase:\nTurno:"
         valores = f"{g_fase}\nJugador {g_jugador.indice + 1}"
-        texto_multilinea(nombres, (x + w - 150, y), 16, negrita = True)
-        texto_multilinea(valores, (x + w - 100, y), 16)
+        texto_multilinea(nombres, (w - 150, 0), 16, negrita = True, surface = self.panel.lienzo)
+        texto_multilinea(valores, (w - 100, 0), 16, surface = self.panel.lienzo)
 
         # Mensajes emitidos
-        texto('Mensajes', (x + self.ANCHURA + 20, y), self.TAMANO_TITULO, subrayado = True)
+        texto('Mensajes', (self.ANCHURA + 20, 0), self.TAMANO_TITULO, subrayado = True, surface = self.panel.lienzo)
         dy0 = g_fuentes[self.TAMANO_TITULO].get_linesize()
         dy = g_fuentes[self.TAMANO_TEXTO].get_linesize()
         for i, (tipo, linea) in enumerate(self.mensajes):
             color = { 'error': self.COLOR_ERROR, 'info': self.COLOR_INFO, 'dinero': self.COLOR_DINERO }[tipo]
             cabecera = tipo.capitalize() + ':'
-            texto(cabecera, (x + self.ANCHURA + 20,      y + dy0 + i * dy), self.TAMANO_TEXTO, color = color, negrita = True)
-            texto(linea,    (x + self.ANCHURA + 70, y + dy0 + i * dy), self.TAMANO_TEXTO)
+            texto(cabecera, (self.ANCHURA + 20, dy0 + i * dy), self.TAMANO_TEXTO, surface = self.panel.lienzo, color = color, negrita = True)
+            texto(linea,    (self.ANCHURA + 70, dy0 + i * dy), self.TAMANO_TEXTO, surface = self.panel.lienzo)
 
         # Textos informativos
-        texto('Información', (x + 10, y), self.TAMANO_TITULO, subrayado = True)
+        texto('Información', (10, 0), self.TAMANO_TITULO, subrayado = True, surface = self.panel.lienzo)
         for mensaje in self.textos:
-            texto_multilinea(mensaje['texto'], (x + mensaje['pos'][0], y + mensaje['pos'][1]), mensaje['tamaño'],
+            texto_multilinea(mensaje['texto'], mensaje['pos'], mensaje['tamaño'], surface = self.panel.lienzo,
                              color = mensaje['color'], negrita = mensaje['negrita'], max_ancho = self.ANCHURA + 20 - mensaje['pos'][0])
         for boton in self.botones:
             boton.dibujar()
 
-        texto(f"{g_reloj.get_fps():.2f} fps", (x + w - 80, y + h - 20), 14, alineado_h='d')
+    def dibujar(self):
+        """Dibujar el panel en pantalla. Hay que hacerlo cada fotograma."""
+        x, y, w, h = self.panel.rect
+        self.panel.dibujar()
+        texto(f"{g_reloj.get_fps():.2f} fps", (x + w - 80, y + h - 20), 14, alineado_h = 'd')
 
     def resetear(self):
         """Reiniciar los contenidos del panel informativo"""
+        self.cambio = False
         self.textos = []
         self.mensajes = []
         for boton in self.botones:
             boton.resetear()
+        self.renderizar()
 
 class Reglamento:
     """Representa el conjunto de reglas, para el pantallazo inicial"""
@@ -947,7 +962,7 @@ class Reglamento:
     def __init__(self):
         # Crear superficie auxiliar con todo el contenido, para evitar re-renderizar cada fotograma
         x, y = (self.MARGEN_EXTERNO, self.MARGEN_EXTERNO)
-        dim = (ANCHURA - 2 * x, ALTURA - 2 * y)
+        w, h = dim = (ANCHURA - 2 * x, ALTURA - 2 * y)
         self.panel = Panel((x, y), dim, radio=20, color=self.COLOR_FONDO, textura='malla')
         self.visible = False
 
@@ -956,6 +971,13 @@ class Reglamento:
         lineas = dividir_texto(self.REGLAS, fuente, self.panel.rect.w - 2 * self.MARGEN_INTERNO)
         self.paginas = math.ceil(len(lineas) / self.LINEAS_POR_PAGINA)
         self.pagina = 0
+        self.textos = [
+            Texto('REGLAS', (ANCHURA / 2, 0), color=self.COLOR_TEXTO, tamaño=self.TAMANO_TITULO, alineado_h='c', surface=self.panel.lienzo),
+            Texto(
+                Reglamento.REGLAS, (self.MARGEN_INTERNO, self.TAMANO_TITULO + 10), color=self.COLOR_TEXTO, tamaño=self.TAMANO_FUENTE,
+                max_ancho=w-2*self.MARGEN_INTERNO, max_alto=self.LINEAS_POR_PAGINA, surface=self.panel.lienzo
+            )
+        ]
 
         # Botones de control
         w = self.panel.rect.w
@@ -971,7 +993,6 @@ class Reglamento:
             boton.mover((w - anchura) / 2 + diff, 0)
             diff += boton.dim[0] + 10
 
-
         # Renderizar la superficie, habra que hacerlo cada vez que haya un cambio (ver self.actualizar)
         self.resetear()
 
@@ -979,11 +1000,8 @@ class Reglamento:
         """Renderizar el contenido del reglamento. Hay que llamarlo cada vez que cambie (e.g. al paginar)."""
         x, y, w, h = self.panel.rect
         self.panel.renderizar()
-        texto('REGLAS', (x + ANCHURA / 2, y), color=self.COLOR_TEXTO, tamaño=self.TAMANO_TITULO, alineado_h='c', surface=self.panel.lienzo)
-        texto_multilinea(
-            Reglamento.REGLAS, (x + self.MARGEN_INTERNO, y + self.TAMANO_TITULO + 10), color=self.COLOR_TEXTO, tamaño=self.TAMANO_FUENTE,
-            max_ancho=w-2*self.MARGEN_INTERNO, max_alto=self.LINEAS_POR_PAGINA, surface=self.panel.lienzo, pagina=self.pagina
-        )
+        self.textos[0].dibujar()
+        self.textos[1].dibujar(self.pagina)
         for boton in self.botones:
             boton.dibujar()
 
@@ -1169,6 +1187,13 @@ class Tienda:
             boton.indexar(sum(1 for producto in g_jugador.infraestructuras if type(producto) is infra))
             boton.actualizar()
 
+        # Si no hay ningún botón seleccionado, borramos el texto informativo
+        selec = False
+        for boton in self.botones.values():
+            selec = selec or boton.selec
+        if not selec:
+            g_info.borrar()
+
     def dibujar(self):
         """Renderizar la tienda en pantalla"""
         self.panel.dibujar()
@@ -1344,40 +1369,44 @@ class Boton:
             return
 
         # Modificar estado (seleccionado / pulsado) y detectar cambios
-        selec_antes = self.selec
-        pulsado_antes = self.pulsado
-        self.selec = self.panel.raton()
-        self.pulsado = self.selec and g_click
-        cambio = selec_antes != self.selec or pulsado_antes != self.pulsado
+        selec_antes    = self.selec
+        pulsado_antes  = self.pulsado
+        self.selec     = self.panel.raton()
+        self.pulsado   = self.selec and g_click
+        ha_selec       = not selec_antes and self.selec
+        ha_pulsado     = not pulsado_antes and self.pulsado
+        cambio_selec   = selec_antes != self.selec
+        cambio_pulsado = pulsado_antes != self.pulsado
+        cambio         = cambio_selec or cambio_pulsado
 
         # Reproducir sonidos
-        if not selec_antes and self.selec and self.audio_sel:
+        if ha_selec and self.audio_sel:
             reproducir_sonido(self.audio_sel, 'interfaz')
-        if not pulsado_antes and self.pulsado and self.audio_pul:
+        if ha_pulsado and self.audio_pul:
             reproducir_sonido(self.audio_pul, 'interfaz')
         if self.pulsado and self.block:
             emitir_error(self.block_razon)
 
         # Actualizar color y renderizar boton
-        if self.pulsado:
-            self.panel.color = self.color_pulsado
-        elif self.selec:
-            self.panel.color = self.color_selec
-        else:
-            self.panel.color = self.color
         if cambio:
+            if self.pulsado:
+                self.panel.color = self.color_pulsado
+            elif self.selec:
+                self.panel.color = self.color_selec
+            else:
+                self.panel.color = self.color
             self.renderizar()
 
         # Mostrar información en el panel informativo
-        if self.selec and self.info:
+        if ha_selec and self.info:
             self.info()
 
         # Ejecutar acción si está pulsado
-        if self.pulsado and self.accion and not self.block:
+        if ha_pulsado and self.accion and not self.block:
             self.accion(*self.args)
 
         # Devolver si ha habido cambio de estado
-        return selec_antes != self.selec or pulsado_antes != self.pulsado
+        return cambio
 
     def renderizar(self):
         """Volver a renderizar el contenido del boton. Solo hace falta hacerlo cuando ha cambiado."""
@@ -1402,6 +1431,193 @@ class Boton:
             self.indice = 0
         self.renderizar()
 
+class Texto:
+    """Representa un bloque de texto. Permite configurar el texto (tamaño, color, tipo, etc)
+     y controlar los márgenes horizontales y verticales. Soporta múltiples líneas y páginas.
+     OJO: Renderizar texto es lento, así que debe hacerse sólo cuando ha cambiado.
+     Dibujarlo cada fotograma (blitearlo) es mucho más rápido, como cualquier superficie"""
+
+    def __init__(self, cadena, posicion, tamaño = TEXTO_TAMANO, color = COLOR_TEXTO, alineado_h = 'i', alineado_v = 'a',
+                 negrita = False, cursiva = False, subrayado = False, mono = False, surface = g_pantalla, max_ancho = None,
+                 max_alto = None):
+
+        # Inicializar miembros
+        self.texto      = None # Cadena de texto
+        self.pos        = None # Posición del texto en la superficie base (tupla de coordenadas)
+        self.tamaño     = None # Tamaño de fuente del texto (entero)
+        self.color      = None # Color del texto
+        self.alineado_h = None # Alineacion horizontal [i(zquierda), c(entro), d(erecha)]
+        self.alineado_v = None # Alineacion vertical [a(rriba), c(entro), b(ase)]
+        self.negrita    = None # Usar tipo de fuente negrita (booleano)
+        self.cursiva    = None # Usar tipo de fuente itálica (booleano)
+        self.subrayado  = None # Usar tipo de fuente subrayado (booleano)
+        self.mono       = None # Usar tipo de fuente monoespaciada (booleano)
+        self.surface    = None # Superficie base donde se renderizará el texto
+        self.max_ancho  = None # Margen horizontal del texto (en píxeles). Determinará las líneas.
+        self.max_alto   = None # Margen vertical del texto (en líneas). Determinará las páginas.
+        self.lineas     = None # Lista de líneas de texto (han de renderizarse por separado)
+        self.imagenes   = None # Lista de líneas ya pre-renderizadas (superficies)
+        self.paginas    = None # Número de páginas totales
+
+        # Configurar miembros
+        self.editar(cadena, actualizar = False)
+        self.escalar(tamaño, actualizar = False)
+        self.tipar(negrita, cursiva, subrayado, mono, actualizar = False)
+        self.mover(posicion, alineado_h, alineado_v)
+        self.colorear(color, actualizar = False)
+        self.marginar(max_ancho, actualizar = False)
+        self.paginar(max_alto)
+        self.surface = surface
+        self.imagenes = []
+
+        # Pre-renderizar texto
+        self.renderizar()
+
+    def editar(self, texto, actualizar = True):
+        """Cambiar el contenido del texto"""
+        if self.texto == texto:
+            return
+        self.texto = texto
+        if actualizar:
+            self.actualizar()
+
+    def escalar(self, tamaño, actualizar = True):
+        """Cambiar el tamaño del texto"""
+        # Aseguramos que el tamaño de fuente deseado está disponible
+        if self.tamaño == tamaño:
+            return
+        if not tamaño in TEXTO_TAMANOS:
+            tamaño = TEXTO_TAMANO
+        self.tamaño = tamaño
+        if actualizar:
+            self.actualizar()
+
+    def tipar(self, negrita = None, cursiva = None, subrayado = None, mono = None, actualizar = True):
+        """Cambiar el tipo de la fuente"""
+
+        # Ver si se ha especificado realmente algún cambio de tipo
+        cambio_negrita   = negrita   is not None and self.negrita   != negrita
+        cambio_cursiva   = cursiva   is not None and self.cursiva   != cursiva
+        cambio_subrayado = subrayado is not None and self.subrayado != subrayado
+        cambio_mono      = mono      is not None and self.mono      != mono
+        if not cambio_negrita and not cambio_cursiva and not cambio_subrayado and not cambio_mono:
+            return
+
+        # Guardar nuevos valores y actualizar
+        if cambio_negrita:
+            self.negrita = negrita
+        if cambio_cursiva:
+            self.cursiva = cursiva
+        if cambio_subrayado:
+            self.subrayado = subrayado
+        if cambio_mono:
+            self.mono = mono
+        if actualizar:
+            self.actualizar()
+
+    def mover(self, posicion, alineado_h = 'i', alineado_v = 'a'):
+        """Cambiar la posición del texto en la superficie base"""
+
+        # Seleccionar fuente apropiada
+        fuente = g_fuentes_mono[self.tamaño] if self.mono else g_fuentes[self.tamaño]
+
+        # Modificar posición para respetar el alineado especificado
+        dx, dy = fuente.size(self.texto)
+        if type(posicion) is pygame.math.Vector2:
+            x, y = posicion.x, posicion.y
+        else:
+            x, y = posicion
+        x -= (dx if alineado_h == 'd' else dx / 2 if alineado_h == 'c' else 0)
+        y -= (dy if alineado_v == 'b' else dy / 2 if alineado_v == 'c' else 0)
+
+        # Guardar nuevos valores
+        self.pos = (x, y)
+        self.alineado_h = alineado_h
+        self.alineado_v = alineado_v
+
+    def colorear(self, color, actualizar = True):
+        """Cambiar el color del texto"""
+        if self.color == color:
+            return
+        self.color = color
+        if actualizar:
+            self.actualizar()
+
+    def marginar(self, max_ancho, actualizar = True):
+        """Dividir el texto en líneas de la anchura deseada"""
+
+        # Si no se especifica anchura máxima, forzamos una para que el algoritmo funcione
+        self.max_ancho = max_ancho
+        if not self.max_ancho:
+            max_ancho = 1000000
+        fuente = self.fuente()
+
+        # Inicializar lista de palabras y líneas para preparar el algoritmo
+        palabras = self.texto.split(' ')
+        self.lineas = []
+        linea_actual = ""
+
+        # Iterar palabras y construir listado de líneas
+        for palabra in palabras:
+            if '\n' in palabra:
+                sub_palabras = palabra.split('\n')
+                for sub_palabra in sub_palabras[:-1]:
+                    if fuente.size(linea_actual + sub_palabra)[0] <= max_ancho:
+                        linea_actual += sub_palabra + " "
+                    else:
+                        self.lineas.append(linea_actual)
+                        linea_actual = sub_palabra + " "
+                    self.lineas.append(linea_actual)
+                    linea_actual = ""
+                linea_actual = sub_palabras[-1] + " "
+            elif fuente.size(linea_actual + palabra)[0] <= max_ancho:
+                linea_actual += palabra + " "
+            else:
+                self.lineas.append(linea_actual)
+                linea_actual = palabra + " "
+        self.lineas.append(linea_actual)
+
+        # Opcionalmente, reparginar y renderizar el texto de nuevo, ya que las líneas han cambiado
+        if actualizar:
+            self.paginar()
+            self.renderizar()
+
+    def paginar(self, max_alto):
+        """Cambiar el número de líneas por página, y en consecuencia, el número de páginas"""
+        self.max_alto = max_alto
+        if self.max_alto:
+            self.paginas = math.ceil(len(self.lineas) / self.max_alto)
+        else:
+            self.paginas = 1
+
+    def fuente(self):
+        """Obtener la fuente apropriada"""
+        fuente = g_fuentes_mono[self.tamaño] if self.mono else g_fuentes[self.tamaño]
+        fuente.underline = self.subrayado
+        fuente.bold      = self.negrita
+        fuente.italic    = self.cursiva
+        return fuente
+
+    def renderizar(self):
+        """Renderizar la superficie del texto. Sólo hacer cuando haya un cambio."""
+        fuente = self.fuente()
+        self.imagenes = [fuente.render(linea, True, self.color) for linea in self.lineas]
+        print(len(self.lineas))
+
+    def actualizar(self):
+        """Actualizar el texto. Debe llamarse cada vez que haya un cambio (de texto, de fuente, etc)"""
+        self.marginar(self.max_ancho, actualizar = False)
+        self.paginar(self.max_alto)
+        self.renderizar()
+
+    def dibujar(self, pagina = 0):
+        """Dibujar el texto en pantalla. Hacer todos los fotogramas."""
+        fuente = self.fuente()
+        salto = fuente.get_linesize()
+        imagenes = self.imagenes[self.max_alto * pagina : self.max_alto * (pagina + 1)] if self.max_alto else self.imagenes
+        for i, imagen in enumerate(imagenes):
+            self.surface.blit(imagen, (self.pos[0], self.pos[1] + i * salto))
+
 # < -------------------------------------------------------------------------- >
 #                         FUNCIONES AUXILIARES INTERFAZ
 # < -------------------------------------------------------------------------- >
@@ -1425,6 +1641,9 @@ def ayuda():
     pygame.draw.rect(g_pantalla, '#000000', (x, y, anchura, altura), 1)
     texto_multilinea(g_ayuda, (x + 2, y), AYUDA_TAMANO)
 
+# OJO! Renderizar texto es LENTO. No se debería llamar a esta función todos los
+# fotogramas. En su lugar, mejor renderizar el texto deseado una vez, y guardar
+# el resultado en una superficie que se blitee cada fotograma.
 def texto(
         cadena,                    # Cadena de texto a renderizar
         posicion,                  # Posicion del texo con respecto a la superficie
@@ -1613,7 +1832,6 @@ def actualizar_variables():
     """Actualizacion de variables en cada fotograma"""
     global g_ayuda, g_raton
     g_ayuda = None
-    g_info.borrar()
     g_raton = pygame.mouse.get_pos()
 
 def actualizar_fase_pantallazo():
