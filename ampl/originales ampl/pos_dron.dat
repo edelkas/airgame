@@ -1,0 +1,29 @@
+#Como cargar datos en AMPL
+#Conjuntos
+set C := C1 C2 C3
+
+##Desarrollo de los condicionantes
+#C1: caB =<nB
+#C2: caB =<nB+1
+#C3: cdrB =0
+
+##Definición de las abreviaturas utilizadas en los condicionantes
+#caB =Cantidad de aeronaves en la base aérea
+#cacB =Cantidad de drones en la base aérea
+#nB =Nivel de la base aérea
+
+set B := B(j)
+
+##Bases aéreas del J2 (máquinas)
+
+#Parámetros
+#Coeficientes de importancia de cada condicionante a cada base
+param Y	B(j)	:=
+C1	3	
+C2	1	
+C3	2	
+;	
+
+#Se da o no cada condicionante
+Param S:=
+;	

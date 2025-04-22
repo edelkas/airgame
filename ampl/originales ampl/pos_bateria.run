@@ -1,0 +1,12 @@
+#Llamar al modelo y a los datos
+model comprabateria.mod;
+data comprabateria.dat;
+
+#Llamar al compilador o solver (cplex/gurobi)
+option solver gurobi;
+
+#Resuelve el modelo;
+solve;
+
+#Muestra los resultados de la variable
+display X;

@@ -1,0 +1,35 @@
+#Como cargar datos en AMPL
+#Conjuntos
+set C := C1 C2 C3 C4
+
+##Desarrollo de los condicionantes
+#C1: cinL =1
+#C2: cinL >=2
+#C3: craL >0
+#C4: cbaL >0
+
+##Definición de las abreviaturas utilizadas en los condicionantes
+#cinL = Cantidad de infraestructuras (ciudades o bases) en un radio <= 4 casillas
+#craL =Cantidad de radares en un radio <= 4 casillas
+#cbaL =Cantidad de baterías antiaéreas en un radio <=2 casillas
+
+set L := L(j)
+
+##Casillas con superioridad aérea del J2 (máquina)
+
+#Parámetros
+#Coeficientes de importancia de cada condicionante a cada casilla
+param Y	L(j)	:=
+C1	1	
+C2	3	
+C3	-2	
+C4	-3	
+;			
+
+#Se da o no cada condicionante
+param S:=
+;	
+
+#Existe o no la superioridad aérea del propio jugador en dicha casilla
+param A:=
+;

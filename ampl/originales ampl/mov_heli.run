@@ -1,0 +1,13 @@
+#Llamar al modelo y a los datos
+model movhelicoptero.mod;
+data movhelicoptero.dat;
+
+#Llamar al compilador o solver (cplex/gurobi)
+option solver gurobi;
+
+#Resuelve el modelo;
+solve;
+
+#Muestra los resultados de la variable
+display X;
+

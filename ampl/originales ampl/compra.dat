@@ -1,0 +1,121 @@
+#Como cargar datos en AMPL
+#Conjuntos
+set C := C1 C2 C3 C4 C5 C6 C7 C8 C9 C10 C11 C12 C13 C14 C15 C16 C17 C18 C19 C20 C21 C22 C23 C24 C25 C26 C27 C28 C29
+
+
+##Desarrollo de los condicionantes
+#C1: ac2 <1
+#C2: aa2 <1
+#C3: at2 <1
+#C4: he2 <1
+#C5: dr2 <1
+#C6: aa2 <(ta/5)
+#C7: ac2 <(ta/5)
+#C8: at2 <(ta/5)
+#C9: he2 <(ta/5)
+#C10: dr2 <(ta/5)
+#C11: aa2 <aa1
+#C12: ac2 <ac1
+#C13: at2 <at1
+#C14: he2 <he1
+#C15: dr2 <dr1
+#C16: ba2 <(ta2/2)
+#C17: ba2 <(ti2/2)
+#C18: ci2 <(ti2/2)
+#C19: ba2 <ba1
+#C20: ci2 <ci1
+#C21: ra2 <(ti2/2)
+#C22: ba2 <(ti2/2)
+#C23: ra2 <ti2
+#C24: ba2 <ti2
+#C25: BASE AÉREA SIN VIGILAR (por radar)
+#C26: CIUDAD SIN VIGILAR (por radar)
+#C27: BASE AÉREA SIN PROTEGER (por batería)
+#C28: CIUDAD SIN PROTEGER (por batería)
+#C29: sa2 <sa1
+
+##Definición de algunas de las abreviaturas utilizadas en los condicionantes
+#ac=nº A.CAZA
+#aa=nº A.ATAQUE
+#at=nº A.TRANSPORTE
+#he=nº HELICÓPERO
+#dr=nº DRON
+#ta=aa+ac+at+he+dr
+#ba=nº BASE AÉREA
+#ci=nº CIUDAD
+#ti=ba+ci
+#ra=nºRADAR
+#ba=nº BATERÍA ANTIAÉREA
+#sa=casillas con superioridad aérea
+#xx(1)=parámetro asociado a J1
+#xx(2)=parámetro asociado a J2 (máquina)
+
+
+set A := A1 A2 A3 A4 A5 A6 A7 A8 A9
+
+##Desarrollo de las acciones
+#A1: Compra de avión de caza
+#A2: Compra de avión de ataque
+#A3: Compra de avión de transporte
+#A4: Compra de helicóptero
+#A5: Compra de dron
+#A6: Compra de radar
+#A7: Compra de batería antiaérea
+#A8: Compra de ciudad
+#A9: Compra de base aérea
+
+
+#Parámetros
+#Coeficientes de importancia de cada condicionante a cada acción
+param Y:	A1	A2	A3	A4	A5	A6	A7	A8	A9	:=
+C1	120	0	0	0	0	0	0	0	0	
+C2	0	200	0	0	0	0	0	0	0	
+C3	0	0	180	0	0	0	0	0	0	
+C4	0	0	0	50	0	0	0	0	0	
+C5	0	0	0	0	30	0	0	0	0	
+C6	80	0	0	0	0	0	0	0	0	
+C7	0	150	0	0	0	0	0	0	0	
+C8	0	0	120	0	0	0	0	0	0	
+C9	0	0	0	30	0	0	0	0	0	
+C10	0	0	0	0	20	0	0	0	0	
+C11	50	0	0	0	0	0	0	0	0	
+C12	0	80	0	0	0	0	0	0	0	
+C13	0	0	50	0	0	0	0	0	0	
+C14	0	0	0	7	0	0	0	0	0	
+C15	0	0	0	0	15	0	0	0	0	
+C16	-60	-30	-50	-30	-20	0	0	0	1000	
+C17	0	0	0	0	0	0	0	0	650	
+C18	0	0	0	0	0	0	0	850	0	
+C19	0	160	0	30	15	0	0	0	350	
+C20	0	130	0	20	10	0	0	500	0	
+C21	0	0	0	0	0	80	0	0	0	
+C22	0	0	0	0	0	0	400	0	0	
+C23	0	0	0	0	0	50	0	0	0	
+C24	0	0	0	0	0	0	250	0	0	
+C25	0	0	0	0	10	75	0	0	0	
+C26	0	0	0	0	5	60	0	0	0	
+C27	40	0	0	0	0	0	350	0	0	
+C28	30	0	0	0	0	0	300	0	0	
+C29	100	100	250	20	5	-10	-50	-150	-100	
+;										
+
+#Se da o no cada condicionante
+param S:=
+;
+
+#Coste de la acción a tomar
+param K :=
+A1 67
+A2 142
+A3 101
+A4 24
+A5 17
+A6 48
+A7 206
+A8 200
+A9 300
+;
+
+#Presupuesto actual
+param P:=
+;

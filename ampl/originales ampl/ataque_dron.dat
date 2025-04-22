@@ -1,0 +1,39 @@
+#Como cargar datos en AMPL
+#Conjuntos
+set C := C1 C2 C3 C4
+
+##Desarrollo de los condicionantes
+#C1: baeL1
+#C2: ciL1
+#C3: raL1
+#C4: baL1
+
+
+##Definici�n de las abreviaturas utilizadas en los condicionantes
+#baeL =base a�rea en la casilla
+#ciL =ciudad en la casilla
+#raL =radar en la casilla
+#baL =bater�a en la casilla
+#xx(1)=par�metro asociado a J1
+#xx(2)=par�metro asociado a J2 (m�quina)
+
+set L := L(j)
+
+##Casillas
+
+#Par�metros
+#Coeficientes de importancia de cada condicionante a cada casilla
+param Y	L(j) :=
+C1	10	
+C2	8	
+C3	4	
+C4	6	
+;						
+
+#Se da o no cada condicionante
+param S:=
+;	
+
+# Distancia de la casilla a la aeronave desde donde se ataca
+param D:=
+;
