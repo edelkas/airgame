@@ -563,10 +563,10 @@ class Casilla:
     def cosechar(self):
         """Otorgar bonus de crédito al jugador"""
         if self.hay_supremacia():
-            self.jugador.cobrar(self.BONUS_F)
+            g_jugador.cobrar(self.BONUS_F)
             return self.BONUS_F
         elif self.hay_superioridad():
-            self.jugador.cobrar(self.BONUS)
+            g_jugador.cobrar(self.BONUS)
             return self.BONUS
         return 0
 
@@ -581,7 +581,7 @@ class Casilla:
 
     def hay_superioridad(self):
         """Detecta si el jugador actual tiene superioridad aérea en la casilla"""
-        return g_jugador.indice == 0 and self.sup >= self.supCas or g_jugador.indice == 1 and self.sup <= self.supCas
+        return g_jugador.indice == 0 and self.sup >= self.supCas or g_jugador.indice == 1 and self.sup <= -self.supCas
 
     def hay_supremacia(self):
         """Detecta si el jugador actual tiene supremacia aérea en la casilla"""
@@ -772,6 +772,7 @@ class Informacion:
     COLOR_ERROR    = '#c00000' # Color del texto "Error"
     COLOR_INFO     = '#0000c0' # Color del texto "Info"
     COLOR_DINERO   = '#c0c000' # Color del texto "Dinero"
+    COLOR_INTEL    = '#00c000' # Color del texto "Intel"
     ANCHURA        = 550       # Anchura en píxeles de la sección de información
 
     """Representa el panel informativo"""
@@ -788,6 +789,7 @@ class Informacion:
         # Creamos (y colocamos) los botones de acciones
         self.botones = [
             Boton((0,0), texto="Jugar",     anchura=80, surface=self.panel.lienzo, origen=(x,y), accion=siguiente_jugador),
+            Boton((0,0), texto="Mover",     anchura=80, surface=self.panel.lienzo, origen=(x,y), accion=siguiente_paso),
             Boton((0,0), texto="Música",    anchura=80, surface=self.panel.lienzo, origen=(x,y), accion=cambiar_musica),
             Boton((0,0), texto="Reglas",    anchura=80, surface=self.panel.lienzo, origen=(x,y), accion=g_reglas.mostrar, audio_pul='puerta_abre'),
             Boton((0,0), texto="Reiniciar", anchura=80, surface=self.panel.lienzo, origen=(x,y), accion=resetear),
@@ -819,7 +821,12 @@ class Informacion:
         """Añadir un mensaje al panel y renderizarlo"""
 
         # Configurar texto
-        color = { 'error': self.COLOR_ERROR, 'info': self.COLOR_INFO, 'dinero': self.COLOR_DINERO }[tipo]
+        color = {
+            'error':  self.COLOR_ERROR,
+            'info':   self.COLOR_INFO,
+            'dinero': self.COLOR_DINERO,
+            'intel':  self.COLOR_INTEL
+        }[tipo]
         cabecera = tipo.capitalize() + ':'
         imagen1 = Texto(cabecera, (0, 0), self.TAMANO_TEXTO, surface = self.panel.lienzo, color = color, negrita = True)
         imagen2 = Texto(texto,    (0, 0), self.TAMANO_TEXTO, surface = self.panel.lienzo)
@@ -850,6 +857,10 @@ class Informacion:
         """Guardar un mensaje relativo al dinero del jugador"""
         self.añadir_mensaje('dinero', texto)
 
+    def intel(self, texto):
+        """Guardar un mensaje con la inteligencia recibida"""
+        self.añadir_mensaje('intel', texto)
+
     def actualizar(self):
         """Actualizar los contenidos del panel. Llamar cada fotograma."""
         for boton in self.botones:
@@ -859,19 +870,14 @@ class Informacion:
         self.fps.editar(f"{g_reloj.get_fps():.2f} fps")
         self.cambio = False
 
-    def actualizar_texto(self, nombre = None):
+    def actualizar_texto(self):
         """Actualizar un texto (o todos) y renderizarlo de nuevo"""
-
-        # Determinar los textos que se van a actualizar
-        if not nombre:
-            nombres = ['valores']
-        else:
-            nombres = [nombre]
-
-        # Actualizar los textos
-        for nombre in nombres:
-            if nombre == 'valores':
-                self.renders['valores'].editar(f"{g_fase}\nJugador {g_jugador.indice + 1}")
+        if g_fase == 'Preparación':
+            self.renders['nombres'].editar("Fase:\nTurno:")
+            self.renders['valores'].editar(f"{g_fase}\nJugador {g_jugador.indice + 1}")
+        elif g_fase == 'Principal':
+            self.renders['nombres'].editar("Fase:\nTurno:\nPaso:")
+            self.renders['valores'].editar(f"{g_fase}\nJugador {g_jugador.indice + 1}\n{g_paso}")
 
     def renderizar(self):
         """Renderizar el panel de información. Sólo hay que hacerlo cada vez que su contenido cambie."""
@@ -1095,6 +1101,8 @@ class Reglamento:
 
 class Jugador:
     """Representa a cada uno de los jugadores"""
+    MAX_INTELIGENCIA = 5
+
     jugadores = 0
 
     def __init__(self):
@@ -1108,6 +1116,7 @@ class Jugador:
         self.infraestructuras = []
         self.credito          = CREDITO_INICIAL
         self.preparado        = False
+        self.inteligencia     = 0
 
     def comprar(self, producto):
         """Adquirir un medio y añadirlo al inventario"""
@@ -1115,6 +1124,17 @@ class Jugador:
             return
         if producto in g_tienda.MEDIOS:
             self.medios.append(producto(self))
+
+    def contratar(self):
+        """Contratar inteligencia, que proporciona información adicional al comienzo de cada turno"""
+        if self.inteligencia == self.MAX_INTELIGENCIA:
+            emitir_error('Ya tienes el máximo nivel de inteligencia')
+        elif not self.pagar(Inteligencia.PRECIO):
+            return
+        else:
+            self.inteligencia += 1
+            self.medios.append(Inteligencia(self))
+            g_info.info(f'Contrada inteligencia de nivel {self.inteligencia}')
 
     def construir(self, producto, casilla):
         """Construir o mejorar una infraestructura en el mapa"""
@@ -1162,6 +1182,7 @@ class Jugador:
         g_info.dinero(f"Has cosechado {cosechado}M€")
         if cosechado:
             reproducir_sonido('cobrar', 'efectos')
+            g_tienda.actualizar_textos()
 
     def preparar(self):
         """Realizar automáticamente la fase de preparación. Esta función está simplemente para facilitar el testeo."""
@@ -1211,7 +1232,9 @@ class Tienda:
         """Crear cada uno de los botones de la tienda"""
         accion = None
         args = ()
-        if producto in self.MEDIOS:
+        if producto == Inteligencia:
+            accion = lambda: g_jugador.contratar()
+        elif producto in self.MEDIOS:
             accion = lambda p: g_jugador.comprar(p)
             args = (producto,)
         else:
@@ -1228,8 +1251,10 @@ class Tienda:
         # Actualizar botones de medios
         for medio in self.MEDIOS:
             boton = self.botones[medio]
-            if g_fase == 'Preparación':
-                boton.bloquear('No se pueden comprar medios en fase de preparación')
+            if g_fase != 'Principal':
+                boton.bloquear('Sólo se pueden adquirir medios en la fase principal')
+            elif g_paso != 'Recursos':
+                boton.bloquear('Sólo se pueden adquirir medios en el paso de recursos')
             else:
                 boton.desbloquear()
             boton.indexar(sum(1 for producto in g_jugador.medios if type(producto) is medio))
@@ -1242,6 +1267,12 @@ class Tienda:
         visibles = casilla and casilla.hay_supremacia()
         for infra in self.INFRAESTRUCTURAS:
             boton = self.botones[infra]
+            if g_fase != 'Principal':
+                boton.bloquear('Sólo se pueden adquirir medios en la fase principal')
+            elif g_paso != 'Recursos':
+                boton.bloquear('Sólo se pueden adquirir medios en el paso de recursos')
+            else:
+                boton.desbloquear()
             boton.visible = visibles
             boton.indexar(sum(1 for producto in g_jugador.infraestructuras if type(producto) is infra))
             boton.actualizar()
@@ -1746,16 +1777,18 @@ def siguiente_fotograma():
 
 def siguiente_jugador():
     """Cambiar de turno"""
-    global g_jugador
+    global g_jugador, g_adversario
     if not g_jugador:
         g_jugador = g_jugadores[0]
+        g_adversario = g_jugadores[1]
     elif verificar_turno():
-        g_jugador = g_jugadores[(g_jugador.indice + 1) % 2]
+        g_jugador, g_adversario = g_adversario, g_jugador
     else:
         return
     g_info.info(f"Turno del jugador {g_jugador.indice + 1}")
-    g_info.actualizar_texto('valores')
+    g_info.actualizar_texto()
     g_tienda.actualizar_textos()
+    resetear_paso()
 
 def siguiente_fase():
     """Avanzar a la siguiente fase del juego"""
@@ -1773,7 +1806,7 @@ def cambiar_fase(nombre):
         g_fase = nombre
         if g_fase not in ['Pantallazo', 'Reglas']:
             g_info.info(f'Iniciada fase "{nombre}"')
-            g_info.actualizar_texto('valores')
+            g_info.actualizar_texto()
         return True
     return False
 
@@ -1783,18 +1816,24 @@ def resetear_fase():
 
 def siguiente_paso():
     """Avanzar al siguiente paso del turno"""
+    if g_fase != 'Principal':
+        emitir_error('Sólo se puede cambiar de paso en la fase principal')
+        return
     global g_paso
     indice = g_pasos.index(g_paso)
     if indice < len(g_pasos) - 1:
-        g_paso = g_pasos[indice + 1]
+        cambiar_paso(g_pasos[indice + 1])
     else:
-        resetear_paso()
+        emitir_error('Ya no hay más pasos, juega para cambiar de turno')
 
 def cambiar_paso(nombre):
     """Cambiar a otro paso del turno"""
-    global g_paso
+    global g_paso, g_paso_listo
     if nombre in g_pasos:
         g_paso = nombre
+        g_info.info(f'Iniciado paso "{nombre}"')
+        g_info.actualizar_texto()
+        g_paso_listo = False
         return True
     return False
 
@@ -1832,6 +1871,10 @@ def actualizar_fase_principal():
         siguiente_jugador()
         return
 
+    # Comenzamos la fase principal si es el primer fotograma
+    if not g_paso:
+        cambiar_paso('Reporte')
+
     # Actualizar estado sólo si el escenario es visible
     if visible:
         g_escenario.actualizar()
@@ -1848,7 +1891,9 @@ def actualizar_fase_principal():
     if g_reglas.visible:
         actualizar_fase_reglas()
 
-    # Actualizar paso específico del turno
+    # Actualizar paso específico del turno, si hace falta
+    if g_paso_listo:
+        return
     if g_paso == 'Reporte':
         actualizar_paso_reporte()
     elif g_paso == 'Inteligencia':
@@ -1870,12 +1915,25 @@ def actualizar_paso_reporte():
 def actualizar_paso_inteligencia():
     """Desarrollar el paso de inteligencia. El jugador recibe información adicional
     en función del nivel de inteligencia que haya adquirido."""
-    pass
+    global g_paso_listo
+    if g_jugador.inteligencia >= 1:
+        g_info.intel(f'Tu adversario tiene {g_adversario.credito}M€')
+    if g_jugador.inteligencia >= 2:
+        g_info.intel('Nivel 2 - ')
+    if g_jugador.inteligencia >= 3:
+        g_info.intel('Nivel 3 - ')
+    if g_jugador.inteligencia >= 4:
+        g_info.intel('Nivel 4 - ')
+    if g_jugador.inteligencia >= 5:
+        g_info.intel(f'Tu adversario tiene inteligencia nivel {g_adversario.inteligencia}')
+    g_paso_listo = True
 
 def actualizar_paso_ingresos():
     """Desarrollar el paso de ingresos. El jugador cosecha crédito adicional gracias
     a las casillas en las que tenga superioridad / supremacia aérea, así como sus ciudades."""
+    global g_paso_listo
     g_jugador.cosechar()
+    g_paso_listo = True
 
 def actualizar_paso_recursos():
     """Desarrollar el paso de recursos. El jugador invierte crédito en adquirir medios
@@ -1937,10 +1995,12 @@ g_fase  = None
 cambiar_fase('Pantallazo')
 g_pasos = ['Reporte', 'Inteligencia', 'Ingresos', 'Recursos', 'Ataque', 'Despliegue']
 g_paso  = None
+g_paso_listo = False
 
 # Jugadores de la partida
-g_jugadores = [Jugador() for _ in range(2)]         # Lista de jugadores
-g_jugador   = g_jugadores[0]                        # Jugador actual
+g_jugadores  = [Jugador() for _ in range(2)]         # Lista de jugadores
+g_jugador    = g_jugadores[0]                        # Jugador actual
+g_adversario = g_jugadores[1]                        # Jugador contrincante
 
 # Principales partes de la interfaz (no cambiar estas líneas de orden)
 g_reglas    = Reglamento()                          # Paginador de reglas
