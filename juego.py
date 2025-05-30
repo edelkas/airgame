@@ -452,7 +452,7 @@ class Infraestructura(MedioEstrategico):
         if self.jugador.pagar(self.PRECIO_MEJORA):
             self.nivel += 1
             reproducir_sonido('construir', 'efectos')
-            self.casilla.numero = Texto(str(self.nivel), self.casilla.centro, 12, self.COLOR, alineado_h = 'c', alineado_v = 'c', negrita = True, surface = g_escenario.panel.surface)
+            self.casilla.numerar()
 
     def cosechar(self):
         """Obtener el bonus económico que otorga la infraestructura"""
@@ -514,6 +514,7 @@ class Casilla:
 
     def resetear(self):
         """Inicializar todas las propiedades y contenidos de la casilla"""
+        self.numero = None
         self.sel = False
         self.pul = False
         self.asignar()
@@ -544,6 +545,20 @@ class Casilla:
             self.sup = self.supCas
         else:
             self.sup = -self.supCas
+
+    def numerar(self):
+        """Cambiar el número de la casilla"""
+        x, y = self.centro
+        self.numero = Texto(
+            str(self.infraestructura.nivel),
+            (x + self.RADIO / 6, y),
+            12,
+            self.infraestructura.COLOR,
+            alineado_h = 'c',
+            alineado_v = 'c',
+            negrita = True,
+            surface = g_escenario.panel.surface
+        )
 
     def cosechar(self):
         """Otorgar bonus de crédito al jugador"""
@@ -1121,7 +1136,7 @@ class Jugador:
                 return
             infra = producto(self, casilla)
             casilla.infraestructura = infra
-            casilla.numero = Texto(str(infra.nivel), casilla.centro, 12, infra.COLOR, alineado_h = 'c', alineado_v = 'c', negrita = True, surface = g_escenario.panel.surface)
+            casilla.numerar()
             self.infraestructuras.append(infra)
             reproducir_sonido('construir', 'efectos')
 
