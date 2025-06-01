@@ -269,8 +269,9 @@ class Medio:
     RADIOVIG      = None # Distancia a la que puede vigilar otros medios aéreos (casillas)
     SUPAEREA      = None # Peso del medio a la hora de aportar superioridad aérea (puntos)
 
-    def __init__(self, jugador):
+    def __init__(self, jugador, casilla = None):
         self.jugador = jugador
+        self.casilla = casilla
 
     @classmethod
     def info(cls):
@@ -436,8 +437,7 @@ class Infraestructura(MedioEstrategico):
     NIVELES = 9 # Maximo nivel de una infraestructura
 
     def __init__(self, jugador, casilla):
-        super().__init__(jugador)
-        self.casilla = casilla
+        super().__init__(jugador, casilla)
         self.nivel = 1
 
     def destruir(self):
@@ -509,12 +509,22 @@ class Casilla:
         self.centro = pygame.math.Vector2(Escenario.ORIGEN_X + self.DIM_X * (x + (y % 2) / 2), Escenario.ORIGEN_Y + self.DIM_Y * y)
         self.verts = [self.centro + v for v in esc.hex_vertices]
         self.infraestructura = None
-        self.numero = None
+        self.numero = Texto(
+            '',
+            (self.centro[0] - self.RADIO * 0.4, self.centro[1]),
+            12,
+            self.infraestructura.COLOR if self.infraestructura else '#000000',
+            alineado_h = 'l',
+            alineado_v = 'c',
+            negrita = True,
+            surface = esc.panel.surface
+        )
         self.resetear()
 
     def resetear(self):
         """Inicializar todas las propiedades y contenidos de la casilla"""
-        self.numero = None
+        self.infraestructura = None
+        self.numero.borrar()
         self.sel = False
         self.pul = False
         self.asignar()
@@ -548,17 +558,10 @@ class Casilla:
 
     def numerar(self):
         """Cambiar el número de la casilla"""
-        x, y = self.centro
-        self.numero = Texto(
-            str(self.infraestructura.nivel),
-            (x + self.RADIO / 6, y),
-            12,
-            self.infraestructura.COLOR,
-            alineado_h = 'c',
-            alineado_v = 'c',
-            negrita = True,
-            surface = g_escenario.panel.surface
-        )
+        texto = str(self.infraestructura.nivel)
+        texto += '*' if len(self.medios()) > 0 else ''
+        self.numero.editar(texto)
+        self.numero.colorear(self.infraestructura.COLOR)
 
     def cosechar(self):
         """Otorgar bonus de crédito al jugador"""
@@ -587,6 +590,15 @@ class Casilla:
         """Detecta si el jugador actual tiene supremacia aérea en la casilla"""
         return g_jugador.indice == 0 and self.sup >= MULT_SUPREMACIA * self.supCas or g_jugador.indice == 1 and self.sup <= -MULT_SUPREMACIA * self.supCas
 
+    def es_base(self):
+        """Detecta si el jugador actual tiene una base aérea en la casilla"""
+        infra = self.infraestructura
+        return infra and type(infra) is Base and infra.jugador == g_jugador
+
+    def medios(self):
+        """Devuelve la lista de medios que el jugador actual tiene en esta casilla (desplegados o no)"""
+        return [medio for medio in g_jugador.medios if medio.casilla == self]
+
     def colorear(self):
         """Determinar color"""
         if self.sup <= -MULT_SUPREMACIA * self.supCas:
@@ -606,7 +618,7 @@ class Casilla:
         infra = self.infraestructura
         if infra:
             pygame.draw.polygon(surface, infra.COLOR, self.verts, 4)
-        if self.numero:
+        if not self.numero.vacio():
             self.numero.dibujar()
         if self.sel:
             pygame.draw.polygon(surface, MAPA_COLOR_BORDE, self.verts, 2)
@@ -1124,7 +1136,8 @@ class Jugador:
         if not self.pagar(producto.PRECIO):
             return
         if producto in g_tienda.MEDIOS:
-            self.medios.append(producto(self))
+            self.medios.append(producto(self, g_escenario.casilla_pulsa))
+        g_info.dinero(f'Has adquirido un {producto.NOMBRE}')
 
     def contratar(self):
         """Contratar inteligencia, que proporciona información adicional al comienzo de cada turno"""
@@ -1160,6 +1173,7 @@ class Jugador:
             casilla.numerar()
             self.infraestructuras.append(infra)
             reproducir_sonido('construir', 'efectos')
+            g_info.dinero(f'Has construido una {producto.NOMBRE}')
 
     def pagar(self, cantidad):
         """Desembolsar una cierta cantidad, si hay crédito disponible"""
@@ -1248,6 +1262,7 @@ class Tienda:
 
     def actualizar(self):
         """Actualizar estado del contenido de la tienda"""
+        casilla = g_escenario.casilla_pulsa
 
         # Actualizar botones de medios
         for medio in self.MEDIOS:
@@ -1256,6 +1271,10 @@ class Tienda:
                 boton.bloquear('Sólo se pueden adquirir medios en la fase principal')
             elif g_paso != 'Recursos':
                 boton.bloquear('Sólo se pueden adquirir medios en el paso de recursos')
+            elif issubclass(medio, MedioAereo) and (not casilla or not casilla.es_base()):
+                boton.bloquear('Los medios aéreos han de ser colocados en bases aéreas')
+            elif issubclass(medio, MedioAntiaereo) and (not casilla or not casilla.hay_superioridad()):
+                boton.bloquear('Los medios antiaéreos han de ser colocados en casillas con superioridad aérea')
             else:
                 boton.desbloquear()
             boton.indexar(sum(1 for producto in g_jugador.medios if type(producto) is medio))
@@ -1264,17 +1283,16 @@ class Tienda:
                 g_ayuda.mostrar()
 
         # Actualizar botones de infraestructuras
-        casilla = g_escenario.casilla_pulsa
-        visibles = casilla and casilla.hay_supremacia()
         for infra in self.INFRAESTRUCTURAS:
             boton = self.botones[infra]
             if g_fase != 'Principal':
                 boton.bloquear('Sólo se pueden adquirir medios en la fase principal')
             elif g_paso != 'Recursos':
                 boton.bloquear('Sólo se pueden adquirir medios en el paso de recursos')
+            elif not casilla or not casilla.hay_supremacia():
+                boton.bloquear('Sólo se pueden construir infraestructuras en casillas con supremacía aérea')
             else:
                 boton.desbloquear()
-            boton.visible = visibles
             boton.indexar(sum(1 for producto in g_jugador.infraestructuras if type(producto) is infra))
             boton.actualizar()
             if boton.selec:
@@ -1568,6 +1586,14 @@ class Texto:
         if actualizar:
             self.mover(self.pos, self.alineado_h, self.alineado_v)
             self.actualizar()
+
+    def borrar(self):
+        """Elimina el contenido del texto"""
+        self.texto = ''
+
+    def vacio(self):
+        """Compueba si no hay caracteres en el texto"""
+        return self.texto == ''
 
     def escalar(self, tamaño, actualizar = True):
         """Cambiar el tamaño del texto"""
