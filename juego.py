@@ -800,7 +800,7 @@ class Informacion:
 
         # Pre-renderizamos los textos que vamos a usar, para optimizar
         self.renders['nombres']  = Texto("Fase:\nTurno:", (w - 150, 0), 16, negrita = True, surface = self.panel.lienzo)
-        self.renders['valores']  = Texto(f"{g_fase}\nJugador {g_jugador.indice + 1}", (w - 100, 0), 16, surface = self.panel.lienzo)
+        self.renders['valores']  = Texto(f"{g_fase}\nJugador 0", (w - 100, 0), 16, surface = self.panel.lienzo)
         self.renders['mensajes'] = Texto('Mensajes', (self.ANCHURA + 20, 0), self.TAMANO_TITULO, subrayado = True, surface = self.panel.lienzo)
         self.renders['info']     = Texto('Información', (10, 0), self.TAMANO_TITULO, subrayado = True, surface = self.panel.lienzo)
         self.fps = Texto(f"{g_reloj.get_fps():.2f} fps", (x + w - 80, y + h - 20), 14, alineado_h = 'd')
@@ -872,12 +872,13 @@ class Informacion:
 
     def actualizar_texto(self):
         """Actualizar un texto (o todos) y renderizarlo de nuevo"""
+        indice = g_jugador.indice + 1 if g_jugador else 0
         if g_fase == 'Preparación':
             self.renders['nombres'].editar("Fase:\nTurno:")
-            self.renders['valores'].editar(f"{g_fase}\nJugador {g_jugador.indice + 1}")
+            self.renders['valores'].editar(f"{g_fase}\nJugador {indice}")
         elif g_fase == 'Principal':
             self.renders['nombres'].editar("Fase:\nTurno:\nPaso:")
-            self.renders['valores'].editar(f"{g_fase}\nJugador {g_jugador.indice + 1}\n{g_paso}")
+            self.renders['valores'].editar(f"{g_fase}\nJugador {indice}\n{g_paso}")
 
     def renderizar(self):
         """Renderizar el panel de información. Sólo hay que hacerlo cada vez que su contenido cambie."""
@@ -1224,7 +1225,7 @@ class Tienda:
 
         # Pre-renderizar textos, para optimizar
         self.textos = {
-            'dinero': Texto(f"Dinero: {g_jugador.credito}", (ANCHURA * ANCHURA_JUEGO + PANEL_SEPARACION, PANEL_SEPARACION), self.TAM_FUENTE),
+            'dinero': Texto(f"Dinero: 0", (ANCHURA * ANCHURA_JUEGO + PANEL_SEPARACION, PANEL_SEPARACION), self.TAM_FUENTE),
             'tienda': Texto('Tienda', (ANCHURA * (ANCHURA_JUEGO + 1) / 2, PANEL_SEPARACION + linea - 5), self.TAM_FUENTE, alineado_h = 'c', subrayado = True)
         }
 
@@ -1788,7 +1789,8 @@ def siguiente_jugador():
     g_info.info(f"Turno del jugador {g_jugador.indice + 1}")
     g_info.actualizar_texto()
     g_tienda.actualizar_textos()
-    resetear_paso()
+    if g_paso:
+        resetear_paso()
 
 def siguiente_fase():
     """Avanzar a la siguiente fase del juego"""
@@ -1847,36 +1849,10 @@ def actualizar_variables():
     g_ayuda.ocultar()
     g_raton = pygame.mouse.get_pos()
 
-def actualizar_fase_pantallazo():
-    """Dibujar pantallazo inicial"""
-    x = (g_pantalla.get_width() - g_pantallazo.get_width()) / 2
-    y = (g_pantalla.get_height() - g_pantallazo.get_height()) / 2
-    g_pantalla.blit(g_pantallazo, (x, y))
-
-def actualizar_fase_reglas():
-    """Dibujar pantallazo reglas"""
-    g_reglas.mostrar()
-    g_reglas.actualizar()
-    g_reglas.dibujar()
-
-def actualizar_fase_principal():
-    """Actualizar estado en la fase de turnos"""
-    visible = not g_reglas.visible
-    if not g_jugador:
-        siguiente_jugador()
-
-    # Saltar la fase preparatoria, para testear
-    if g_fase == 'Preparación' and SALTAR_PREPARACION:
-        g_jugador.preparar()
-        siguiente_jugador()
-        return
-
-    # Comenzamos la fase principal si es el primer fotograma
-    if not g_paso:
-        cambiar_paso('Reporte')
-
+def actualizar_interfaz():
+    """Actualizar los paneles y el contenido del escenario, tienda e información"""
     # Actualizar estado sólo si el escenario es visible
-    if visible:
+    if not g_reglas.visible:
         g_escenario.actualizar()
         g_tienda.actualizar()
         g_info.actualizar()
@@ -1890,6 +1866,43 @@ def actualizar_fase_principal():
     g_ayuda.dibujar()
     if g_reglas.visible:
         actualizar_fase_reglas()
+
+def actualizar_fase_pantallazo():
+    """Dibujar pantallazo inicial"""
+    x = (g_pantalla.get_width() - g_pantallazo.get_width()) / 2
+    y = (g_pantalla.get_height() - g_pantallazo.get_height()) / 2
+    g_pantalla.blit(g_pantallazo, (x, y))
+
+def actualizar_fase_reglas():
+    """Dibujar pantallazo reglas"""
+    g_reglas.mostrar()
+    g_reglas.actualizar()
+    g_reglas.dibujar()
+
+def actualizar_fase_preparacion():
+    """Actualizar estado en la fase preparatoria"""
+    if not g_jugador:
+        siguiente_jugador()
+
+    # Saltar la fase preparatoria, para testear
+    if SALTAR_PREPARACION:
+        g_jugador.preparar()
+        siguiente_jugador()
+        return
+
+    # Actualizar paneles y contenido del escenario, tienda e información
+    actualizar_interfaz()
+
+def actualizar_fase_principal():
+    """Actualizar estado en la fase de turnos"""
+    # Comenzamos el primer paso si acabamos de iniciar la fase
+    if not g_paso:
+        cambiar_paso('Reporte')
+    if not g_jugador:
+        siguiente_jugador()
+
+    # Actualizar paneles y contenido del escenario, tienda e información
+    actualizar_interfaz()
 
     # Actualizar paso específico del turno, si hace falta
     if g_paso_listo:
@@ -1998,9 +2011,9 @@ g_paso  = None
 g_paso_listo = False
 
 # Jugadores de la partida
-g_jugadores  = [Jugador() for _ in range(2)]         # Lista de jugadores
-g_jugador    = g_jugadores[0]                        # Jugador actual
-g_adversario = g_jugadores[1]                        # Jugador contrincante
+g_jugadores  = [Jugador() for _ in range(2)] # Lista de jugadores
+g_jugador    = None                          # Jugador actual
+g_adversario = None                          # Jugador contrincante
 
 # Principales partes de la interfaz (no cambiar estas líneas de orden)
 g_reglas    = Reglamento()                          # Paginador de reglas
@@ -2048,7 +2061,7 @@ while True:
         if not g_reglas.visible:
             siguiente_fase()
     elif g_fase == 'Preparación':         # Fase preparativa inicial
-        actualizar_fase_principal()
+        actualizar_fase_preparacion()
         if sum(1 for jugador in g_jugadores if jugador.preparado) == 2:
             siguiente_fase()
     elif g_fase == 'Principal':           # Fase central del juego
