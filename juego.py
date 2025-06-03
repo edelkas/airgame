@@ -509,9 +509,11 @@ class Casilla:
         self.centro = pygame.math.Vector2(Escenario.ORIGEN_X + self.DIM_X * (x + (y % 2) / 2), Escenario.ORIGEN_Y + self.DIM_Y * y)
         self.verts = [self.centro + v for v in esc.hex_vertices]
         self.infraestructura = None
+        cx, cy = self.centro
+        r = self.RADIO
         self.numero = Texto(
-            '',
-            (self.centro[0] - self.RADIO * 0.4, self.centro[1]),
+            '1',
+            (cx - r * 0.4, cy),
             12,
             self.infraestructura.COLOR if self.infraestructura else '#000000',
             alineado_h = 'l',
@@ -519,14 +521,15 @@ class Casilla:
             negrita = True,
             surface = esc.panel.surface
         )
+        self.indicador = Texto('*', (cx + 0.25 * r, cy - 0.85 * r), 12, '#000000', surface = esc.panel.surface)
         self.resetear()
 
     def resetear(self):
         """Inicializar todas las propiedades y contenidos de la casilla"""
         self.infraestructura = None
-        self.numero.borrar()
         self.sel = False
         self.pul = False
+        self.numero.ocultar()
         self.asignar()
         self.destruir()
         self.recalcular()
@@ -558,10 +561,11 @@ class Casilla:
 
     def numerar(self):
         """Cambiar el número de la casilla"""
-        texto = str(self.infraestructura.nivel)
-        texto += '*' if len(self.medios()) > 0 else ''
-        self.numero.editar(texto)
+        if not self.infraestructura:
+            return
+        self.numero.editar(str(self.infraestructura.nivel))
         self.numero.colorear(self.infraestructura.COLOR)
+        self.numero.mostrar()
 
     def cosechar(self):
         """Otorgar bonus de crédito al jugador"""
@@ -618,8 +622,9 @@ class Casilla:
         infra = self.infraestructura
         if infra:
             pygame.draw.polygon(surface, infra.COLOR, self.verts, 4)
-        if not self.numero.vacio():
-            self.numero.dibujar()
+        self.numero.dibujar()
+        if sum(1 for medio in g_jugador.medios if medio.casilla == self) > 0:
+            self.indicador.dibujar()
         if self.sel:
             pygame.draw.polygon(surface, MAPA_COLOR_BORDE, self.verts, 2)
         if self.pul:
@@ -1563,6 +1568,7 @@ class Texto:
         self.lineas     = None # Lista de líneas de texto (han de renderizarse por separado)
         self.imagenes   = None # Lista de líneas ya pre-renderizadas (superficies)
         self.paginas    = None # Número de páginas totales
+        self.visible    = True # Renderizar o no el texto en pantalla
 
         # Configurar miembros
         self.editar(cadena, actualizar = False)
@@ -1711,8 +1717,18 @@ class Texto:
         self.paginar(self.max_alto)
         self.renderizar()
 
+    def mostrar(self):
+        """Hacer el texto visible en pantalla"""
+        self.visible = True
+
+    def ocultar(self):
+        """No dibujar el texto en pantalla"""
+        self.visible = False
+
     def dibujar(self, pagina = 0):
         """Dibujar el texto en pantalla. Hacer todos los fotogramas."""
+        if not self.visible:
+            return
         fuente = self.fuente()
         salto = fuente.get_linesize()
         imagenes = self.imagenes[self.max_alto * pagina : self.max_alto * (pagina + 1)] if self.max_alto else self.imagenes
