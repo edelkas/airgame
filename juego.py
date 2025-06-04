@@ -314,14 +314,36 @@ class MedioAereo(Medio):
     def __init__(self, jugador, casilla):
         super().__init__(jugador, casilla)
         self.desplegado = False
+        x, y = g_escenario.panel.pos
+        self.texto = Texto(self.NOMBRE, (0, 0), 16, surface = g_escenario.panel.lienzo)
+        self.botones = [
+            Boton((0,0), texto="D", anchura=20, surface=g_escenario.panel.lienzo, origen=(x,y), accion=self.desplegar),
+            Boton((0,0), texto="R", anchura=20, surface=g_escenario.panel.lienzo, origen=(x,y), accion=self.aterrizar),
+            Boton((0,0), texto="A", anchura=20, surface=g_escenario.panel.lienzo, origen=(x,y), accion=self.atacar)
+        ]
 
     def desplegar(self):
         """Desplegar el medio aéreo"""
+        if self.desplegado:
+            emitir_error(f'Este {self.NOMBRE} ya está desplegado')
+            return
         self.desplegado = True
+        g_info.medio(f"{self.NOMBRE} desplegado")
 
     def aterrizar(self):
         """Retornar el medio aéreo a la base de origen"""
+        if not self.desplegado:
+            emitir_error(f'Este {self.NOMBRE} no está desplegado')
+            return
         self.desplegado = False
+        g_info.medio(f"{self.NOMBRE} retornado")
+
+    def atacar(self):
+        """Usar el medio aéreo para atacar otra casilla"""
+        if not self.desplegado:
+            emitir_error(f'Este {self.NOMBRE} no está desplegado')
+            return
+        g_info.medio(f"Ataque con {self.NOMBRE}")
 
 class MedioAntiaereo(Medio):
     """Representa cualquier medio anti-aéreo"""
@@ -744,12 +766,8 @@ class Escenario:
         # Fuerza un re-renderizado
         self.cambio = True
 
-    def actualizar(self):
+    def actualizar_casillas(self):
         """Detectar si alguna casilla esta seleccionada o ha sido pulsada"""
-
-        # Si el ratón no está sobre el panel del escenario, no hay nada que actualizar
-        if not self.panel.raton():
-            return
 
         # Aproximar la casilla en la que estamos, para evitar testearlas todas
         pos_vec = pygame.Vector2(g_raton)
@@ -785,6 +803,27 @@ class Escenario:
         if self.casilla_pulsa and g_click:
             self.casilla_pulsa.despulsar()
 
+    def actualizar(self):
+        """Ejecutar la lógica del contenido del escenario cada fotograma"""
+
+        # Si el ratón no está sobre el escenario, muchas cosas no pueden cambiar
+        if self.panel.raton():
+            
+            # Detectar cambios en los botones de acción
+            if self.casilla_pulsa:
+                avos = [medio for medio in self.casilla_pulsa.medios() if isinstance(medio, MedioAereo)]
+                for avo in avos:
+                    for boton in avo.botones:
+                        self.cambio = self.cambio or boton.actualizar()
+
+            # Detectar cambios en casillas seleccionadas o pulsadas
+            self.actualizar_casillas()
+
+        # Si ha habido algún cambio en el contenido del escenario, renderizarlo de nuevo
+        if self.cambio:
+            self.renderizar()
+        self.cambio = False
+
     def renderizar(self):
         """Generar gráficos del escenario de nuevo. Sólo ejecutar cuando algo haya cambiado."""
         # Panel de fondo e indicador de turno
@@ -804,15 +843,21 @@ class Escenario:
 
         # Panel de acciones con los medios
         self.texto.dibujar()
+        if not self.casilla_pulsa:
+            return
+        avos = [medio for medio in self.casilla_pulsa.medios() if isinstance(medio, MedioAereo)]
+        w = self.panel.dim[0]
+        dy = g_fuentes[16].get_linesize()
+        x, y = (0.9 * w, dy)
+        for avo in avos:
+            for boton in avo.botones:
+                boton.situar(x, y)
+                boton.dibujar()
+                x += boton.panel.dim[0]
+            y += dy
 
     def dibujar(self):
         """Dibujar todo el contenido del escenario en pantalla. Ejecutar cada fotograma."""
-        # Si ha habido algún cambio en el contenido del escenario, volver a renderizarlo
-        if self.cambio:
-            self.renderizar()
-            self.cambio = False
-
-        # Blitear el contenido en pantalla
         self.panel.dibujar()
         if self.casilla_sobre:
             self.casilla_sobre.ayuda()
@@ -838,6 +883,8 @@ class Informacion:
     COLOR_INFO     = '#0000c0' # Color del texto "Info"
     COLOR_DINERO   = '#c0c000' # Color del texto "Dinero"
     COLOR_INTEL    = '#00c000' # Color del texto "Intel"
+    COLOR_MEDIO    = '#c000c0' # Color del texto "Medio"
+    COLOR_ALT      = '#00c0c0' # Color reservado
     ANCHURA        = 550       # Anchura en píxeles de la sección de información
 
     """Representa el panel informativo"""
@@ -890,7 +937,8 @@ class Informacion:
             'error':  self.COLOR_ERROR,
             'info':   self.COLOR_INFO,
             'dinero': self.COLOR_DINERO,
-            'intel':  self.COLOR_INTEL
+            'intel':  self.COLOR_INTEL,
+            'medio':  self.COLOR_MEDIO
         }[tipo]
         cabecera = tipo.capitalize() + ':'
         imagen1 = Texto(cabecera, (0, 0), self.TAMANO_TEXTO, surface = self.panel.lienzo, color = color, negrita = True)
@@ -925,6 +973,10 @@ class Informacion:
     def intel(self, texto):
         """Guardar un mensaje con la inteligencia recibida"""
         self.añadir_mensaje('intel', texto)
+
+    def medio(self, texto):
+        """Guardar un mensaje relacionado con acciones de medios (ataques, despliegues...)"""
+        self.añadir_mensaje('medio', texto)
 
     def actualizar(self):
         """Actualizar los contenidos del panel. Llamar cada fotograma."""
@@ -1422,8 +1474,13 @@ class Panel:
         if self.grosor > 0 and self.color_borde:
             pygame.draw.rect(self.lienzo, self.color_borde, (0, 0) + self.dim, width = self.grosor, border_radius = self.radio)
 
+    def situar(self, x, y):
+        """Cambiar la posición (absoluta) del panel"""
+        self.pos = (x, y)
+        self.rect = pygame.Rect(self.pos, self.dim)
+
     def mover(self, dx, dy):
-        """Cambiar la posicion del panel"""
+        """Cambiar la posicion (relativa) del panel"""
         self.pos = (self.pos[0] + dx, self.pos[1] + dy)
         self.rect = pygame.Rect(self.pos, self.dim)
 
@@ -1494,8 +1551,13 @@ class Boton:
 
         self.resetear()
 
+    def situar(self, x, y):
+        """Cambiar la posicion (absoluta) del boton"""
+        self.panel.situar(x, y)
+        self.pos = (x, y)
+
     def mover(self, dx, dy):
-        """Cambiar la posicion del boton"""
+        """Cambiar la posicion (relativa) del boton"""
         self.panel.mover(dx, dy)
         self.pos = (self.pos[0] + dx, self.pos[1] + dy)
 
