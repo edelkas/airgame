@@ -311,6 +311,18 @@ class Medio:
 class MedioAereo(Medio):
     """Representa cualquier medio aéreo"""
 
+    def __init__(self, jugador, casilla):
+        super().__init__(jugador, casilla)
+        self.desplegado = False
+
+    def desplegar(self):
+        """Desplegar el medio aéreo"""
+        self.desplegado = True
+
+    def aterrizar(self):
+        """Retornar el medio aéreo a la base de origen"""
+        self.desplegado = False
+
 class MedioAntiaereo(Medio):
     """Representa cualquier medio anti-aéreo"""
 
@@ -519,9 +531,9 @@ class Casilla:
             alineado_h = 'l',
             alineado_v = 'c',
             negrita = True,
-            surface = esc.panel.surface
+            surface = esc.panel.lienzo
         )
-        self.indicador = Texto('*', (cx + 0.25 * r, cy - 0.85 * r), 12, '#000000', surface = esc.panel.surface)
+        self.indicador = Texto('*', (cx + 0.25 * r, cy - 0.85 * r), 12, '#000000', surface = esc.panel.lienzo)
         self.resetear()
 
     def resetear(self):
@@ -623,7 +635,7 @@ class Casilla:
         if infra:
             pygame.draw.polygon(surface, infra.COLOR, self.verts, 4)
         self.numero.dibujar()
-        if sum(1 for medio in g_jugador.medios if medio.casilla == self) > 0:
+        if g_jugador and sum(1 for medio in g_jugador.medios if medio.casilla == self) > 0:
             self.indicador.dibujar()
         if self.sel:
             pygame.draw.polygon(surface, MAPA_COLOR_BORDE, self.verts, 2)
@@ -636,6 +648,7 @@ class Casilla:
             return
         self.sel = True
         g_escenario.casilla_sobre = self
+        g_escenario.cambio = True
         reproducir_sonido('casilla_sel', 'interfaz')
 
     def deseleccionar(self):
@@ -644,6 +657,7 @@ class Casilla:
             return
         self.sel = False
         g_escenario.casilla_sobre = None
+        g_escenario.cambio = True
 
     def pulsar(self):
         """Pulsar la casilla cuando el raton hace click"""
@@ -651,6 +665,7 @@ class Casilla:
             return
         self.pul = True
         g_escenario.casilla_pulsa = self
+        g_escenario.cambio = True
         reproducir_sonido('casilla_pul', 'interfaz')
 
     def despulsar(self):
@@ -659,26 +674,40 @@ class Casilla:
             return
         self.pul = False
         g_escenario.casilla_pulsa = None
+        g_escenario.cambio = True
 
     def ayuda(self):
         """Mostrar el recuadro de ayuda al pasar el ratón sobre la casilla"""
+
+        # Coeficientes de superioridad y jugador
         texto_ayuda = f"{self.supCas} / {abs(self.sup)}"
         if self.sup != 0:
             indice = 1 if self.sup > 0 else 2
             texto_ayuda += f" (J{indice})"
+
+        # Información de la infraestructura
         infra = self.infraestructura
         if infra:
             texto_ayuda += f"\n{type(infra).__name__} ({infra.nivel})"
+
+            # Bases aéreas: Medios aéreos movilizados
+            avos = [medio for medio in self.medios() if isinstance(medio, MedioAereo)]
+            movil = [avo for avo in avos if avo.desplegado]
+            if len(avos) > 0 or type(infra) is Base:
+                texto_ayuda += f"\nAvos: {len(movil)} / {infra.nivel} ({len(avos)})"
+
+        # Cambiar texto y hacerlo visible
         g_ayuda.cambiar(texto_ayuda)
         g_ayuda.mostrar()
 
 class Escenario:
-    ORIGEN_X = (ANCHURA * ANCHURA_JUEGO - MAPA_DIM_X * Casilla.DIM_X) / 2
+    ORIGEN_X = 2 * Casilla.DIM_X # (ANCHURA * ANCHURA_JUEGO - MAPA_DIM_X * Casilla.DIM_X) / 2
     ORIGEN_Y = ALTURA * ALTURA_JUEGO - MAPA_DIM_Y * Casilla.DIM_Y
     ORIGEN = pygame.Vector2(ORIGEN_X, ORIGEN_Y)
 
     def __init__(self, panel):
         self.panel = panel
+        self.cambio = False
 
         # Calcular las dimensiones de las casillas
         hex_vert = pygame.math.Vector2.from_polar((Casilla.RADIO * Casilla.BORDE, 90))
@@ -687,6 +716,10 @@ class Escenario:
         # Array de casillas
         self.casillas = [[Casilla(self, x, y) for y in range(MAPA_DIM_Y)] for x in range(MAPA_DIM_X)]
         self.resetear()
+
+        # Panel de acción
+        w = self.panel.dim[0]
+        self.texto = Texto('Medios', (0.9 * w, 0), 24, alineado_h = 'c', subrayado = True, surface = self.panel.lienzo)
 
     def semillear(self):
         """Cambiar la seleccion de celdas aleatorias que tienen supremacia inicial (OJO: resetea las celdas!)"""
@@ -707,6 +740,9 @@ class Escenario:
         for col in self.casillas:
             for casilla in col:
                 casilla.colorear()
+
+        # Fuerza un re-renderizado
+        self.cambio = True
 
     def actualizar(self):
         """Detectar si alguna casilla esta seleccionada o ha sido pulsada"""
@@ -749,23 +785,35 @@ class Escenario:
         if self.casilla_pulsa and g_click:
             self.casilla_pulsa.despulsar()
 
-    def dibujar(self):
-        """Dibujar todo el contenido del escenario en pantalla"""
+    def renderizar(self):
+        """Generar gráficos del escenario de nuevo. Sólo ejecutar cuando algo haya cambiado."""
         # Panel de fondo e indicador de turno
-        self.panel.dibujar()
-        color = MAPA_COLOR_J1_F if g_jugador.indice == 0 else MAPA_COLOR_J2_F
-        x = Escenario.ORIGEN_X + Casilla.DIM_X * ((MAPA_DIM_X + 1.25) * g_jugador.indice - 1)
-        y = Escenario.ORIGEN_Y + MAPA_DIM_Y * Casilla.DIM_Y / 2 - 50
-        rect = (x, y, 10, 100)
-        pygame.draw.rect(self.panel.surface, color, rect, 0, 5)
-        pygame.draw.rect(self.panel.surface, '#000000', rect, 1, 5)
+        self.panel.renderizar()
+        if g_jugador:
+            color = MAPA_COLOR_J1_F if g_jugador.indice == 0 else MAPA_COLOR_J2_F
+            x = Escenario.ORIGEN_X + Casilla.DIM_X * ((MAPA_DIM_X + 1.25) * g_jugador.indice - 1)
+            y = Escenario.ORIGEN_Y + MAPA_DIM_Y * Casilla.DIM_Y / 2 - 50
+            rect = (x, y, 10, 100)
+            pygame.draw.rect(self.panel.lienzo, color, rect, 0, 5)
+            pygame.draw.rect(self.panel.lienzo, '#000000', rect, 1, 5)
 
         # Mapa de celdas
         for columna in self.casillas:
             for casilla in columna:
-                casilla.dibujar(self.panel.surface)
+                casilla.dibujar(self.panel.lienzo)
 
-        # Panel de ayuda al sobrevolar una celda
+        # Panel de acciones con los medios
+        self.texto.dibujar()
+
+    def dibujar(self):
+        """Dibujar todo el contenido del escenario en pantalla. Ejecutar cada fotograma."""
+        # Si ha habido algún cambio en el contenido del escenario, volver a renderizarlo
+        if self.cambio:
+            self.renderizar()
+            self.cambio = False
+
+        # Blitear el contenido en pantalla
+        self.panel.dibujar()
         if self.casilla_sobre:
             self.casilla_sobre.ayuda()
 
@@ -1143,6 +1191,7 @@ class Jugador:
         if producto in g_tienda.MEDIOS:
             self.medios.append(producto(self, g_escenario.casilla_pulsa))
         g_info.dinero(f'Has adquirido un {producto.NOMBRE}')
+        g_escenario.cambio = True
 
     def contratar(self):
         """Contratar inteligencia, que proporciona información adicional al comienzo de cada turno"""
@@ -1179,6 +1228,7 @@ class Jugador:
             self.infraestructuras.append(infra)
             reproducir_sonido('construir', 'efectos')
             g_info.dinero(f'Has construido una {producto.NOMBRE}')
+            g_escenario.cambio = True
 
     def pagar(self, cantidad):
         """Desembolsar una cierta cantidad, si hay crédito disponible"""
@@ -1831,6 +1881,7 @@ def siguiente_jugador():
     g_info.info(f"Turno del jugador {g_jugador.indice + 1}")
     g_info.actualizar_texto()
     g_tienda.actualizar_textos()
+    g_escenario.renderizar()
     if g_paso:
         resetear_paso()
 
