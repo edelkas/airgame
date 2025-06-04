@@ -272,6 +272,7 @@ class Medio:
     def __init__(self, jugador, casilla = None):
         self.jugador = jugador
         self.casilla = casilla
+        self.texto   = Texto(self.NOMBRE, (0, 0), 16, alineado_h = 'd', surface = g_escenario.panel.lienzo)
 
     @classmethod
     def info(cls):
@@ -315,11 +316,10 @@ class MedioAereo(Medio):
         super().__init__(jugador, casilla)
         self.desplegado = False
         x, y = g_escenario.panel.pos
-        self.texto = Texto(self.NOMBRE, (0, 0), 16, surface = g_escenario.panel.lienzo)
         self.botones = [
-            Boton((0,0), texto="D", anchura=20, surface=g_escenario.panel.lienzo, origen=(x,y), accion=self.desplegar),
-            Boton((0,0), texto="R", anchura=20, surface=g_escenario.panel.lienzo, origen=(x,y), accion=self.aterrizar),
-            Boton((0,0), texto="A", anchura=20, surface=g_escenario.panel.lienzo, origen=(x,y), accion=self.atacar)
+            Boton((0,0), texto="D", anchura=20, origen=(x,y), info=lambda: g_ayuda.cambiar('Desplegar'), surface=g_escenario.panel.lienzo, accion=self.desplegar),
+            Boton((0,0), texto="R", anchura=20, origen=(x,y), info=lambda: g_ayuda.cambiar('Retornar'),  surface=g_escenario.panel.lienzo, accion=self.aterrizar),
+            Boton((0,0), texto="A", anchura=20, origen=(x,y), info=lambda: g_ayuda.cambiar('Atacar'),    surface=g_escenario.panel.lienzo, accion=self.atacar)
         ]
 
     def desplegar(self):
@@ -726,6 +726,7 @@ class Escenario:
     ORIGEN_X = 2 * Casilla.DIM_X # (ANCHURA * ANCHURA_JUEGO - MAPA_DIM_X * Casilla.DIM_X) / 2
     ORIGEN_Y = ALTURA * ALTURA_JUEGO - MAPA_DIM_Y * Casilla.DIM_Y
     ORIGEN = pygame.Vector2(ORIGEN_X, ORIGEN_Y)
+    FUENTE  = 24
 
     def __init__(self, panel):
         self.panel = panel
@@ -741,7 +742,7 @@ class Escenario:
 
         # Panel de acción
         w = self.panel.dim[0]
-        self.texto = Texto('Medios', (0.9 * w, 0), 24, alineado_h = 'c', subrayado = True, surface = self.panel.lienzo)
+        self.texto = Texto('Medios', (0.9 * w, 0), self.FUENTE, alineado_h = 'c', subrayado = True, surface = self.panel.lienzo)
 
     def semillear(self):
         """Cambiar la seleccion de celdas aleatorias que tienen supremacia inicial (OJO: resetea las celdas!)"""
@@ -766,7 +767,7 @@ class Escenario:
         # Fuerza un re-renderizado
         self.cambio = True
 
-    def actualizar_casillas(self):
+    def actualizar_casillas(self, despulsar = True):
         """Detectar si alguna casilla esta seleccionada o ha sido pulsada"""
 
         # Aproximar la casilla en la que estamos, para evitar testearlas todas
@@ -800,7 +801,7 @@ class Escenario:
         # Si llegamos aquí, ninguna casilla está seleccionada
         if self.casilla_sobre:
             self.casilla_sobre.deseleccionar()
-        if self.casilla_pulsa and g_click:
+        if self.casilla_pulsa and g_click and despulsar:
             self.casilla_pulsa.despulsar()
 
     def actualizar(self):
@@ -810,14 +811,18 @@ class Escenario:
         if self.panel.raton():
             
             # Detectar cambios en los botones de acción
+            accionado = False
             if self.casilla_pulsa:
                 avos = [medio for medio in self.casilla_pulsa.medios() if isinstance(medio, MedioAereo)]
                 for avo in avos:
                     for boton in avo.botones:
-                        self.cambio = self.cambio or boton.actualizar()
+                        accionado = accionado or boton.actualizar()
+                        if boton.selec:
+                            g_ayuda.mostrar()
+            self.cambio = self.cambio or accionado
 
             # Detectar cambios en casillas seleccionadas o pulsadas
-            self.actualizar_casillas()
+            self.actualizar_casillas(not accionado)
 
         # Si ha habido algún cambio en el contenido del escenario, renderizarlo de nuevo
         if self.cambio:
@@ -845,16 +850,21 @@ class Escenario:
         self.texto.dibujar()
         if not self.casilla_pulsa:
             return
-        avos = [medio for medio in self.casilla_pulsa.medios() if isinstance(medio, MedioAereo)]
         w = self.panel.dim[0]
-        dy = g_fuentes[16].get_linesize()
-        x, y = (0.9 * w, dy)
-        for avo in avos:
-            for boton in avo.botones:
-                boton.situar(x, y)
-                boton.dibujar()
-                x += boton.panel.dim[0]
+        dy = g_fuentes[self.FUENTE].get_linesize()
+        x0, y0 = (0.9 * w, dy)
+        x, y = x0, y0
+        for medio in self.casilla_pulsa.medios():
+            medio.texto.mover((x, y), 'd')
+            medio.texto.dibujar()
+            if isinstance(medio, MedioAereo):
+                for boton in medio.botones:
+                    boton.situar(x, y)
+                    boton.dibujar()
+                    x += 1.25 * boton.panel.dim[0]
+                    dy = 1.25 * boton.panel.dim[1]
             y += dy
+            x = x0
 
     def dibujar(self):
         """Dibujar todo el contenido del escenario en pantalla. Ejecutar cada fotograma."""
