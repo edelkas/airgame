@@ -309,41 +309,75 @@ class Medio:
         g_info.escribir(nombres, ( 10, y0 + 1 * y1), negrita = True)
         g_info.escribir(valores, (120, y0 + 1 * y1))
 
+    def actualizar(self):
+        """
+            Prototipo de función que realiza la lógica interna de cada medio
+            Cada tipo de medio debería implementar la suya propia
+        """
+        pass
+
 class MedioAereo(Medio):
     """Representa cualquier medio aéreo"""
 
     def __init__(self, jugador, casilla):
         super().__init__(jugador, casilla)
-        self.desplegado = False
+        self.base = self.casilla
         x, y = g_escenario.panel.pos
         self.botones = [
             Boton((0,0), texto="D", anchura=20, origen=(x,y), info=lambda: g_ayuda.cambiar('Desplegar'), surface=g_escenario.panel.lienzo, accion=self.desplegar),
             Boton((0,0), texto="R", anchura=20, origen=(x,y), info=lambda: g_ayuda.cambiar('Retornar'),  surface=g_escenario.panel.lienzo, accion=self.aterrizar),
             Boton((0,0), texto="A", anchura=20, origen=(x,y), info=lambda: g_ayuda.cambiar('Atacar'),    surface=g_escenario.panel.lienzo, accion=self.atacar)
         ]
+        self.resetear()
+
+    def resetear(self):
+        """Inicializar los valores del medio"""
+        self.casilla = self.base
+        self.desplegado = False
+        self.turnos = 0
 
     def desplegar(self):
         """Desplegar el medio aéreo"""
+        if g_paso != 'Despliegue':
+            emitir_error('Sólo se pueden desplegar medios aéreos en el paso de despliegue')
+            return
         if self.desplegado:
             emitir_error(f'Este {self.NOMBRE} ya está desplegado')
+            return
+        if len(self.base.infraestructura.avos_desplegados()) >= self.base.infraestructura.nivel:
+            emitir_error(f'Ya no puedes desplegar más medios desde esta base')
             return
         self.desplegado = True
         g_info.medio(f"{self.NOMBRE} desplegado")
 
-    def aterrizar(self):
+    def aterrizar(self, auto = False):
         """Retornar el medio aéreo a la base de origen"""
+        if g_paso != 'Ataque' and g_paso != 'Despliegue' and not auto:
+            emitir_error('Sólo se pueden retornar medios aéreos en los pasos de ataque o despliegue')
+            return
         if not self.desplegado:
             emitir_error(f'Este {self.NOMBRE} no está desplegado')
             return
         self.desplegado = False
         g_info.medio(f"{self.NOMBRE} retornado")
+        self.resetear()
 
     def atacar(self):
         """Usar el medio aéreo para atacar otra casilla"""
+        if g_paso != 'Ataque':
+            emitir_error('Sólo se puede atacar con medios aéreos en el paso de ataque')
+            return
         if not self.desplegado:
             emitir_error(f'Este {self.NOMBRE} no está desplegado')
             return
         g_info.medio(f"Ataque con {self.NOMBRE}")
+
+    def actualizar(self):
+        """Ejecutar lógica del medio aéreo"""
+        if self.turnos < math.ceil(self.AUTONOMIA):
+            self.turnos += 1
+        else:
+            self.aterrizar(True)
 
 class MedioAntiaereo(Medio):
     """Representa cualquier medio anti-aéreo"""
@@ -516,6 +550,14 @@ class Base(Infraestructura):
     SUP           = 60
     CANTIDAD      = 3
     COLOR         = "#00b050"
+
+    def avos(self):
+        """Devuelve la lista de medios aéreos del jugador correspondientes a esta base"""
+        return [medio for medio in self.casilla.medios() if isinstance(medio, MedioAereo)]
+
+    def avos_desplegados(self):
+        """Devueve la lista de medios aéreos desplegados de esta base del jugador"""
+        return [avo for avo in self.avos() if avo.desplegado]
 
 class Capital(Ciudad):
     """Ciudad principal del jugador. Además, perderla implica perder la partida."""
@@ -809,7 +851,7 @@ class Escenario:
 
         # Si el ratón no está sobre el escenario, muchas cosas no pueden cambiar
         if self.panel.raton():
-            
+
             # Detectar cambios en los botones de acción
             accionado = False
             if self.casilla_pulsa:
@@ -1981,16 +2023,16 @@ def resetear_fase():
     """Volver a la primera fase del juego"""
     cambiar_fase('Preparación')
 
-def siguiente_paso():
+def siguiente_paso(manual = True):
     """Avanzar al siguiente paso del turno"""
     if g_fase != 'Principal':
-        emitir_error('Sólo se puede cambiar de paso en la fase principal')
+        emitir_error('Sólo la fase principal tiene pasos')
         return
     global g_paso
     indice = g_pasos.index(g_paso)
     if indice < len(g_pasos) - 1:
         cambiar_paso(g_pasos[indice + 1])
-    else:
+    elif manual:
         emitir_error('Ya no hay más pasos, juega para cambiar de turno')
 
 def cambiar_paso(nombre):
@@ -2137,6 +2179,9 @@ def verificar_turno():
             emitir_error(f"Necesitas {Capital.CANTIDAD} capital, {Ciudad.CANTIDAD} ciudades y {Base.CANTIDAD} bases aéreas.")
             return False
         g_jugador.preparado = True
+    elif g_fase == 'Principal':
+        for medio in g_jugador.medios:
+            medio.actualizar()
     return True
 
 def resetear():
