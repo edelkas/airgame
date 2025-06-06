@@ -139,6 +139,8 @@ MAPA_COLOR_J2      = "#f8cbad" # Color de casilla con superioridad aerea de J2
 MAPA_COLOR_J1_F    = "#2e75b6" # Color de casilla con supremacia aerea de J1
 MAPA_COLOR_J2_F    = "#c55a11" # Color de casilla con supremacia aerea de J2
 MAPA_COLOR_BORDE   = "#9900cc" # Color del borde de la casilla actualmente seleccionada
+MAPA_COLOR_BORDE2  = "#ffee00" # Color del borde de la casilla actualmente seleccionada cuando estamos situando
+MAPA_COLOR_BORDE3  = "#000000" # Color del borde de la casilla actualmente seleccionada cuando está en rango
 
 # Sistema de puntos y superioridad aerea
 COEF_SUP        = 20  # Coeficiente de sup aerea en una casilla normal
@@ -332,12 +334,29 @@ class MedioAereo(Medio):
 
     def resetear(self):
         """Inicializar los valores del medio"""
-        self.casilla = self.base
-        self.desplegado = False
-        self.turnos = 0
+        self.casilla    = self.base # La casilla en la que este medio está actualmente
+        self.desplegado = False     # Si este medio está actualmente desplegado
+        self.turnos     = 0         # Número de turnos desde que este medio fue desplegado
+        self.atacado    = False     # Si este medio ha atacado ya en este turno
 
-    def desplegar(self):
+    def alcance(self):
+        """Calcular el alcance en casillas"""
+        return 2 * math.ceil(self.ALCANCE / 1000.0)
+
+    def autonomia(self, casilla = None):
+        """
+            Calcular la autonomía en turnos, que depende de la distancia a la base.
+            Si no se pasa una casilla, se toma la casilla actual.
+        """
+        distancia = self.base.distancia(casilla or self.casilla)
+        alcance = self.alcance()
+        if distancia > alcance:
+            return -1
+        return math.ceil(self.AUTONOMIA * (1 - distancia / alcance))
+
+    def desplegar(self, casilla = None):
         """Desplegar el medio aéreo"""
+        # Realizar chequeos para asegurarnos de que el despliegue es posible
         if g_paso != 'Despliegue':
             emitir_error('Sólo se pueden desplegar medios aéreos en el paso de despliegue')
             return
@@ -347,37 +366,56 @@ class MedioAereo(Medio):
         if len(self.base.infraestructura.avos_desplegados()) >= self.base.infraestructura.nivel:
             emitir_error(f'Ya no puedes desplegar más medios desde esta base')
             return
+
+        # Si no pasamos casilla, permitimos que el jugador escoja la casilla
+        if not casilla:
+            g_jugador.situar_on(self)
+            return False
+
+        # Si pasamos casilla, realizamos el despliegue
+        if self.casilla.distancia(casilla) > self.alcance():
+            emitir_error(f'Este medio tiene un alcance de {self.alcance()} casillas')
+            return
         self.desplegado = True
-        g_info.medio(f"{self.NOMBRE} desplegado")
+        self.casilla = casilla
+        g_jugador.situar_off()
+        g_info.medio(f"{self.NOMBRE} desplegado (límite {self.autonomia()} turnos)")
+        return True
 
     def aterrizar(self, auto = False):
         """Retornar el medio aéreo a la base de origen"""
-        if g_paso != 'Ataque' and g_paso != 'Despliegue' and not auto:
-            emitir_error('Sólo se pueden retornar medios aéreos en los pasos de ataque o despliegue')
+        if g_paso != 'Despliegue' and not auto:
+            emitir_error('Sólo se pueden retornar medios aéreos en el paso de despliegue')
             return
         if not self.desplegado:
             emitir_error(f'Este {self.NOMBRE} no está desplegado')
             return
         self.desplegado = False
-        g_info.medio(f"{self.NOMBRE} retornado")
+        g_info.medio(f"{self.NOMBRE} retornado{' automáticamente' if auto else ''}")
         self.resetear()
 
     def atacar(self):
         """Usar el medio aéreo para atacar otra casilla"""
-        if g_paso != 'Ataque':
-            emitir_error('Sólo se puede atacar con medios aéreos en el paso de ataque')
+        if g_paso != 'Despliegue':
+            emitir_error('Sólo se puede atacar con medios aéreos en el paso de despliegue')
             return
         if not self.desplegado:
             emitir_error(f'Este {self.NOMBRE} no está desplegado')
             return
+        if self.atacado:
+            emitir_error('Ya has atacado con este medio este turno')
+            return
         g_info.medio(f"Ataque con {self.NOMBRE}")
+        self.atacado = True
 
     def actualizar(self):
         """Ejecutar lógica del medio aéreo"""
-        if self.turnos < math.ceil(self.AUTONOMIA):
-            self.turnos += 1
-        else:
-            self.aterrizar(True)
+        self.atacado = False
+        if self.desplegado:
+            if self.turnos < self.autonomia():
+                self.turnos += 1
+            else:
+                self.aterrizar(True)
 
 class MedioAntiaereo(Medio):
     """Representa cualquier medio anti-aéreo"""
@@ -602,9 +640,10 @@ class Casilla:
 
     def resetear(self):
         """Inicializar todas las propiedades y contenidos de la casilla"""
-        self.infraestructura = None
-        self.sel = False
-        self.pul = False
+        self.infraestructura = None # Infraestructura construida en esta casilla
+        self.sel = False            # Si el ratón está sobre esta casilla
+        self.pul = False            # Si esta casilla está actualmente pulsada
+        self.auto = -1              # Cantidad de turnos que puede permanecer el medio seleccionado en esta casilla
         self.numero.ocultar()
         self.asignar()
         self.destruir()
@@ -660,7 +699,7 @@ class Casilla:
 
     def raton(self, pos_vec):
         """Detecta si el ratón está sobre la casilla. Aproximamos el hexágono por el círculo inscrito."""
-        return pos_vec.distance_squared_to(self.centro) < self.INRADIO ** 2
+        return pos_vec.distance_squared_to(self.centro + g_escenario.panel.pos) < self.INRADIO ** 2
 
     def hay_superioridad(self):
         """Detecta si el jugador actual tiene superioridad aérea en la casilla"""
@@ -692,19 +731,25 @@ class Casilla:
         else:
             self.color = MAPA_COLOR_J1_F
 
+    def bordear(self, surface, color, grosor):
+        """Dibujar el borde hexagonal de la casilla"""
+        pygame.draw.polygon(surface, color, self.verts, grosor)
+
     def dibujar(self, surface):
         """Dibujar casilla en pantalla"""
         pygame.draw.polygon(surface, self.color, self.verts)
-        infra = self.infraestructura
-        if infra:
-            pygame.draw.polygon(surface, infra.COLOR, self.verts, 4)
+        if self.infraestructura:
+            self.bordear(surface, self.infraestructura.COLOR, 4)
         self.numero.dibujar()
         if g_jugador and sum(1 for medio in g_jugador.medios if medio.casilla == self) > 0:
             self.indicador.dibujar()
+        color_borde = MAPA_COLOR_BORDE if not g_jugador or not g_jugador.situando else MAPA_COLOR_BORDE2
+        if self.auto >= 0:
+            self.bordear(surface, MAPA_COLOR_BORDE3, 1)
         if self.sel:
-            pygame.draw.polygon(surface, MAPA_COLOR_BORDE, self.verts, 2)
+            self.bordear(surface, color_borde, 2)
         if self.pul:
-            pygame.draw.polygon(surface, MAPA_COLOR_BORDE, self.verts, 4)
+            self.bordear(surface, color_borde, 4)
 
     def seleccionar(self):
         """Seleccionar la casilla cuando el raton pasa por encima"""
@@ -730,15 +775,19 @@ class Casilla:
         self.pul = True
         g_escenario.casilla_pulsa = self
         g_escenario.cambio = True
+        if g_jugador and g_jugador.situando:
+            g_jugador.situando.desplegar(self)
         reproducir_sonido('casilla_pul', 'interfaz')
 
-    def despulsar(self):
+    def despulsar(self, final = False):
         """Despulsar la casilla"""
         if not self.pul:
             return
         self.pul = False
         g_escenario.casilla_pulsa = None
         g_escenario.cambio = True
+        if g_jugador and final:
+            g_jugador.situar_off()
 
     def ayuda(self):
         """Mostrar el recuadro de ayuda al pasar el ratón sobre la casilla"""
@@ -760,9 +809,23 @@ class Casilla:
             if len(avos) > 0 or type(infra) is Base:
                 texto_ayuda += f"\nAvos: {len(movil)} / {infra.nivel} ({len(avos)})"
 
+        # Turnos de autonomía disponibles al desplegar
+        if self.auto >= 0:
+            texto_ayuda += f"\nTurnos: {self.auto}"
+
         # Cambiar texto y hacerlo visible
         g_ayuda.cambiar(texto_ayuda)
         g_ayuda.mostrar()
+
+    def axial(self):
+        """Calcula la coordenadas axiales de la casilla (lugar de cartesianas)"""
+        return (self.x - (self.y - (self.y & 1)) / 2, self.y)
+
+    def distancia(self, casilla):
+        """Calcula la distancia a otra casilla"""
+        q1, r1 = self.axial()
+        q2, r2 = casilla.axial()
+        return round((abs(q1 - q2) + abs(q1 + r1 - q2 - r2) + abs(r1 - r2)) / 2)
 
 class Escenario:
     ORIGEN_X = 2 * Casilla.DIM_X # (ANCHURA * ANCHURA_JUEGO - MAPA_DIM_X * Casilla.DIM_X) / 2
@@ -844,7 +907,7 @@ class Escenario:
         if self.casilla_sobre:
             self.casilla_sobre.deseleccionar()
         if self.casilla_pulsa and g_click and despulsar:
-            self.casilla_pulsa.despulsar()
+            self.casilla_pulsa.despulsar(True)
 
     def actualizar(self):
         """Ejecutar la lógica del contenido del escenario cada fotograma"""
@@ -985,6 +1048,8 @@ class Informacion:
         """Añadir un mensaje al panel y renderizarlo"""
 
         # Configurar texto
+        if g_jugador:
+            texto = f'(J{g_jugador.indice + 1}) {texto}'
         color = {
             'error':  self.COLOR_ERROR,
             'info':   self.COLOR_INFO,
@@ -1282,11 +1347,13 @@ class Jugador:
 
     def resetear(self):
         """Reiniciar el estado del jugador"""
-        self.medios           = []
-        self.infraestructuras = []
-        self.credito          = CREDITO_INICIAL
-        self.preparado        = False
-        self.inteligencia     = 0
+        self.medios           = []              # Lista completa de medios comprados
+        self.infraestructuras = []              # Lista completa de infraestructuras construidas
+        self.credito          = CREDITO_INICIAL # Crédito disponible (en M$) para gastar en la tienda
+        self.preparado        = False           # Ha concluído su fase de preparación
+        self.situando         = None            # Ha pulsado "Desplegar" o "Aterrizar" y está situando esta aeronave
+        self.inteligencia     = 0               # Nivel de inteligencia actualmente contratado
+        self.situar_off()
 
     def comprar(self, producto):
         """Adquirir un medio y añadirlo al inventario"""
@@ -1365,6 +1432,24 @@ class Jugador:
             for casilla in random.sample(casillas, producto.CANTIDAD):
                 self.construir(producto, casilla)
         self.preparado = True
+
+    def situar_on(self, medio):
+        """Comenzar a situar un medio en el mapa"""
+        self.situando = medio
+        if not g_escenario:
+            return
+        for col in g_escenario.casillas:
+            for casilla in col:
+                casilla.auto = medio.autonomia(casilla) # medio.base.distancia(casilla) <= medio.alcance()
+
+    def situar_off(self):
+        """Terminar de situar un medio en el mapa"""
+        self.situando = None
+        if not g_escenario:
+            return
+        for col in g_escenario.casillas:
+            for casilla in col:
+                casilla.auto = -1
 
 class Tienda:
     """Contiene todos los productos que se pueden adquirir y se encarga de su funcionalidad y renderizado"""
@@ -2122,8 +2207,6 @@ def actualizar_fase_principal():
         actualizar_paso_ingresos()
     elif g_paso == 'Recursos':
         actualizar_paso_recursos()
-    elif g_paso == 'Ataque':
-        actualizar_paso_ataque()
     elif g_paso == 'Despliegue':
         actualizar_paso_despliegue()
 
@@ -2160,11 +2243,6 @@ def actualizar_paso_recursos():
     aéreos, antiaéreos o estratégicos - como inteligencia o infraestructuras."""
     pass
 
-def actualizar_paso_ataque():
-    """Desarrollar el paso de ataque. Las aeronaves desplegadas podrán atacar
-    casillas enemigas, destruyendo sus medios si los ataques son certeros."""
-    pass
-
 def actualizar_paso_despliegue():
     """Desarrollar el paso de despliegue. El jugador moviliza aeronaves en alguna casilla."""
     pass
@@ -2185,6 +2263,7 @@ def verificar_turno():
     return True
 
 def resetear():
+    global g_jugador
     for jugador in g_jugadores:
         jugador.resetear()
     g_reglas.resetear()
@@ -2192,6 +2271,8 @@ def resetear():
     g_tienda.resetear()
     g_info.resetear()
     resetear_fase()
+    g_jugador = None
+    siguiente_jugador()
 
 def salir():
     pygame.event.post(pygame.event.Event(pygame.QUIT))
@@ -2212,24 +2293,30 @@ paneles = {
     'informacion': Panel((sep, ALTURA * ALTURA_JUEGO + sep / 2), (ANCHURA - 2 * sep, ALTURA * ALTURA_INFORMACION - 1.5 * sep), textura='piedras')
 }
 
+# Inicializar variables globales para que estén disponibles
+g_fase       = None  # Fase actual del juego
+g_paso       = None  # Paso actual de la fase principal
+g_paso_listo = False # Indica que el paso ha concluido
+g_jugador    = None  # Jugador actual
+g_adversario = None  # Jugador contrincante
+g_reglas     = None  # Paginador de reglas
+g_escenario  = None  # Casillas del mapa y su contenido
+g_info       = None  # Panel informativo inferior
+g_tienda     = None  # Tienda de productos
+
 # Fases y pasos del juego. Los pasos son las distintas etapas en las que se divide un turno.
 g_fases = ['Pantallazo', 'Reglas', 'Preparación', 'Principal', 'Final']
-g_fase  = None
+g_pasos = ['Reporte', 'Inteligencia', 'Ingresos', 'Recursos', 'Despliegue']
 cambiar_fase('Pantallazo')
-g_pasos = ['Reporte', 'Inteligencia', 'Ingresos', 'Recursos', 'Ataque', 'Despliegue']
-g_paso  = None
-g_paso_listo = False
 
 # Jugadores de la partida
-g_jugadores  = [Jugador() for _ in range(2)] # Lista de jugadores
-g_jugador    = None                          # Jugador actual
-g_adversario = None                          # Jugador contrincante
+g_jugadores  = [Jugador() for _ in range(2)]
 
-# Principales partes de la interfaz (no cambiar estas líneas de orden)
-g_reglas    = Reglamento()                          # Paginador de reglas
-g_escenario = Escenario(paneles['escenario'])       # Casillas del mapa y su contenido
-g_info      = Informacion(paneles['informacion'])   # Panel informativo inferior
-g_tienda    = Tienda(paneles['tienda'])             # Tienda de productos
+# Principales partes de la interfaz (no cambiar estas líneas de orden!)
+g_reglas    = Reglamento()
+g_escenario = Escenario(paneles['escenario'])
+g_info      = Informacion(paneles['informacion'])
+g_tienda    = Tienda(paneles['tienda'])
 
 # Configuracion
 g_config = {
