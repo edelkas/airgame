@@ -1459,6 +1459,7 @@ class Jugador:
         self.infraestructuras = []              # Lista completa de infraestructuras construidas
         self.reporte          = []              # Lista de acciones hechas por el adversario en el turno anterior
         self.credito          = CREDITO_INICIAL # Crédito disponible (en M$) para gastar en la tienda
+        self.cosechado        = 0               # Crédito obtenido en el último turno
         self.preparado        = False           # Ha concluído su fase de preparación
         self.situando         = None            # Ha pulsado "Desplegar" o "Aterrizar" y está situando esta aeronave
         self.atacando         = None            # Ha pulsado "Atacar" y está escogiendo objetivo para esta aeronave
@@ -1526,11 +1527,11 @@ class Jugador:
 
     def cosechar(self):
         """Adquirir crédito adicional debido a la superioridad aérea y las infraestructuras"""
-        cosechado = g_escenario.cosechar()
+        self.cosechado = g_escenario.cosechar()
         for infra in self.infraestructuras:
-            cosechado += infra.cosechar()
-        g_info.dinero(f"Has cosechado {cosechado}M€")
-        if cosechado:
+            self.cosechado += infra.cosechar()
+        g_info.dinero(f"Has cosechado {self.cosechado}M€")
+        if self.cosechado:
             reproducir_sonido('cobrar', 'efectos')
             g_tienda.actualizar_textos()
 
@@ -2052,7 +2053,7 @@ class Texto:
         self.lineas = []
         linea_actual = ""
 
-        # Iterar palabras y construir listado de líneas
+        # Iterar palabras y componer listado de líneas
         for palabra in palabras:
             if '\n' in palabra:
                 sub_palabras = palabra.split('\n')
@@ -2362,15 +2363,26 @@ def actualizar_paso_inteligencia():
     en función del nivel de inteligencia que haya adquirido."""
     global g_paso_listo
     if g_jugador.inteligencia >= 1:
-        g_info.intel(f'Tu adversario tiene {g_adversario.credito}M€')
+        g_info.intel(f'I1: Tu adversario ha cosechado {g_adversario.cosechado}M€')
     if g_jugador.inteligencia >= 2:
-        g_info.intel('Nivel 2 - ')
+        nivel_capital  = [str(infra.nivel) for infra in g_adversario.infraestructuras if type(infra) is Capital][0]
+        nivel_ciudades = ', '.join([str(infra.nivel) for infra in g_adversario.infraestructuras if type(infra) is Ciudad])
+        nivel_bases    = ', '.join([str(infra.nivel) for infra in g_adversario.infraestructuras if type(infra) is Base])
+        g_info.intel(f'I2: Infraestructuras adversarias: Capital ({nivel_capital}), Ciudades ({nivel_ciudades}), Bases ({nivel_bases}).')
     if g_jugador.inteligencia >= 3:
-        g_info.intel('Nivel 3 - ')
+        medios_aereos      = sum(1 for medio in g_adversario.medios if isinstance(medio, MedioAereo))
+        medios_desplegados = sum(1 for medio in g_adversario.medios if isinstance(medio, MedioAereo) and medio.desplegado)
+        medios_antiaereos  = sum(1 for medio in g_adversario.medios if isinstance(medio, MedioAntiaereo))
+        g_info.intel(f'I3: Medios adversarios: Aéreos ({medios_aereos}, {medios_desplegados} desplegados), Anti-aéreos ({medios_antiaereos})')
     if g_jugador.inteligencia >= 4:
-        g_info.intel('Nivel 4 - ')
+        if len(g_adversario.medios) == 0:
+            g_info.intel('I4: Tu adversario no tiene medios')
+        else:
+            medio = random.sample(g_adversario.medios, 1)[0]
+            estado = '' if isinstance(medio, MedioAntiaereo) else ' desplegado' if medio.desplegado else ' estacionado'
+            g_info.intel(f'I4: Tu adversario tiene un {medio.NOMBRE}{estado} en la casilla {medio.casilla.id()}')
     if g_jugador.inteligencia >= 5:
-        g_info.intel(f'Tu adversario tiene inteligencia nivel {g_adversario.inteligencia}')
+        g_info.intel(f'I5: Tu adversario tiene inteligencia de nivel {g_adversario.inteligencia}')
     g_paso_listo = True
 
 def actualizar_paso_ingresos():
