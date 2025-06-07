@@ -342,6 +342,13 @@ class MedioAtaque(Medio):
         if self.ataque_sup:
             return math.ceil(self.DIST_SUP / coef)
 
+    def destruir(self):
+        """Destruir el medio como consecuencia de un ataque"""
+        if isinstance(self, MedioAereo): # Ejercer puntos de superioridad
+            self.casilla.ejercer(self.sup)
+        g_adversario.reportar(f"Tu {self.NOMBRE} fue derribado en la casilla {self.casilla.id()}")
+        self.jugador.medios.remove(self) # Eliminar medio del inventario
+
 class MedioEstrategico(Medio):
     """Representa cualquier medio estratégico (inteligencia, infraestructuras)"""
 
@@ -421,7 +428,7 @@ class MedioAereo(MedioAtaque):
         if not self.desplegado:
             emitir_error(f'Este {self.NOMBRE} no está desplegado')
             return
-        if self.turnos == 0:
+        if self.turnos == 0 and not auto:
             emitir_error('No puedes desplegar y aterrizar un medio en el mismo turno')
             return
 
@@ -468,10 +475,11 @@ class MedioAereo(MedioAtaque):
             medios = [medio for medio in medios if isinstance(medio, MedioAntiaereo)]
         if len(medios) == 0:
             g_info.medio(f"Ataque FALLIDO con {self.NOMBRE} en casilla {casilla.id()}")
+            g_adversario.reportar(f"Ataque adversario fallido a la casilla {casilla.id()}")
             return
         medio = medios[0]
         g_info.medio(f"Ataque EXITOSO con {self.NOMBRE} en casilla {casilla.id()} (derribado {medio.NOMBRE})")
-        g_adversario.medios.remove(medio)
+        medio.destruir()
 
     def actualizar(self):
         """Ejecutar lógica del medio aéreo"""
@@ -736,7 +744,25 @@ class Casilla:
 
     def ejercer(self, puntos):
         """Ejercer una cierta cantidad de superioridad aérea sobre la casilla"""
+
+        # Guardamos el estado previo de la casilla
+        hay_supre1 = self.hay_supremacia(g_adversario)
+        hay_super1 = self.hay_superioridad(g_adversario)
+
+        # Modificamos el coeficiente de superioridad aérea de la casilla
         self.sup += puntos if g_jugador.indice == 0 else -puntos
+
+        # Guardamos el estado posterior de la casilla
+        hay_supre2 = self.hay_supremacia(g_adversario)
+        hay_super2 = self.hay_superioridad(g_adversario)
+
+        # Reportamos cambios en el estado de la casilla
+        if hay_supre1 and not hay_supre2:
+            g_adversario.reportar(f'Has perdido la supremacía aérea en la casilla {self.id()}!')
+        if hay_super1 and not hay_super2:
+            g_adversario.reportar(f'Has perdido la superioridad aérea en la casilla {self.id()}!')
+
+        # Cambiamos el color de la casilla si es necesario
         self.colorear()
 
     def numerar(self):
@@ -774,13 +800,17 @@ class Casilla:
         """Detecta si el ratón está sobre la casilla. Aproximamos el hexágono por el círculo inscrito."""
         return pos_vec.distance_squared_to(self.centro + g_escenario.panel.pos) < self.INRADIO ** 2
 
-    def hay_superioridad(self):
+    def hay_superioridad(self, jugador = None):
         """Detecta si el jugador actual tiene superioridad aérea en la casilla"""
-        return g_jugador.indice == 0 and self.sup >= self.supCas or g_jugador.indice == 1 and self.sup <= -self.supCas
+        if not jugador:
+            jugador = g_jugador
+        return jugador.indice == 0 and self.sup >= self.supCas or jugador.indice == 1 and self.sup <= -self.supCas
 
-    def hay_supremacia(self):
+    def hay_supremacia(self, jugador = None):
         """Detecta si el jugador actual tiene supremacia aérea en la casilla"""
-        return g_jugador.indice == 0 and self.sup >= MULT_SUPREMACIA * self.supCas or g_jugador.indice == 1 and self.sup <= -MULT_SUPREMACIA * self.supCas
+        if not jugador:
+            jugador = g_jugador
+        return jugador.indice == 0 and self.sup >= MULT_SUPREMACIA * self.supCas or jugador.indice == 1 and self.sup <= -MULT_SUPREMACIA * self.supCas
 
     def es_base(self):
         """Detecta si el jugador actual tiene una base aérea en la casilla"""
@@ -1127,7 +1157,7 @@ class Informacion:
 
         # Configurar texto
         if g_jugador:
-            texto = f'(J{g_jugador.indice + 1}) {texto}'
+            texto = f'[J{g_jugador.indice + 1}] {texto}'
         color = {
             'error':  self.COLOR_ERROR,
             'info':   self.COLOR_INFO,
@@ -1427,6 +1457,7 @@ class Jugador:
         """Reiniciar el estado del jugador"""
         self.medios           = []              # Lista completa de medios comprados
         self.infraestructuras = []              # Lista completa de infraestructuras construidas
+        self.reporte          = []              # Lista de acciones hechas por el adversario en el turno anterior
         self.credito          = CREDITO_INICIAL # Crédito disponible (en M$) para gastar en la tienda
         self.preparado        = False           # Ha concluído su fase de preparación
         self.situando         = None            # Ha pulsado "Desplegar" o "Aterrizar" y está situando esta aeronave
@@ -1546,6 +1577,17 @@ class Jugador:
         for col in g_escenario.casillas:
             for casilla in col:
                 casilla.auto = -1
+
+    def reportar(self, msg):
+        """
+            Añadir un mensaje informativo acerca de una acción llevada a cabo
+            por el adversario, que será reportada al jugador en el turno siguiente
+        """
+        self.reporte.append(msg)
+
+    def validar_reporte(self):
+        """Ejecutar una vez vistos los reportes"""
+        self.reporte = []
 
 class Tienda:
     """Contiene todos los productos que se pueden adquirir y se encarga de su funcionalidad y renderizado"""
@@ -2309,7 +2351,11 @@ def actualizar_fase_principal():
 def actualizar_paso_reporte():
     """Desarrollar el paso de reporte. El jugador recibe un reporte
     informativo del movimiento del adversario."""
-    pass
+    global g_paso_listo
+    for reporte in g_jugador.reporte:
+        g_info.info(reporte)
+    g_jugador.validar_reporte()
+    g_paso_listo = True
 
 def actualizar_paso_inteligencia():
     """Desarrollar el paso de inteligencia. El jugador recibe información adicional
