@@ -338,6 +338,7 @@ class MedioAereo(Medio):
         self.desplegado = False     # Si este medio está actualmente desplegado
         self.turnos     = 0         # Número de turnos desde que este medio fue desplegado
         self.atacado    = False     # Si este medio ha atacado ya en este turno
+        self.sup        = 0         # Puntos de superioridad acumulados
 
     def alcance(self):
         """Calcular el alcance en casillas"""
@@ -391,6 +392,7 @@ class MedioAereo(Medio):
             emitir_error(f'Este {self.NOMBRE} no está desplegado')
             return
         self.desplegado = False
+        self.casilla.ejercer(self.sup)
         g_info.medio(f"{self.NOMBRE} retornado{' automáticamente' if auto else ''}")
         self.resetear()
 
@@ -414,6 +416,7 @@ class MedioAereo(Medio):
         if self.desplegado:
             if self.turnos < self.autonomia():
                 self.turnos += 1
+                self.sup += self.SUPAEREA
             else:
                 self.aterrizar(True)
 
@@ -514,7 +517,6 @@ class Radar(MedioAntiaereo):
     DIST_SUP   = 0
     VIGILANCIA = 90
     RADIOVIG   = 440
-    SUPAEREA   = 0
 
 class Bateria(MedioAntiaereo):
     """Representa una batería anti-aérea"""
@@ -527,7 +529,6 @@ class Bateria(MedioAntiaereo):
     DIST_SUP   = 0
     VIGILANCIA = 60
     RADIOVIG   = 260
-    SUPAEREA   = 0
 
 class Inteligencia(MedioEstrategico):
     """Clase genérica para representar inteligencia"""
@@ -645,34 +646,34 @@ class Casilla:
         self.pul = False            # Si esta casilla está actualmente pulsada
         self.auto = -1              # Cantidad de turnos que puede permanecer el medio seleccionado en esta casilla
         self.numero.ocultar()
-        self.asignar()
         self.destruir()
         self.recalcular()
+        self.inicializar_coeficientes()
+        self.asignar()
         self.colorear()
 
     def asignar(self):
         """Determinar propietario de la casilla, que tiene inicialmente la superioridad aerea"""
+        self.jugador = g_jugadores[0] if self.sup >= self.supCas else g_jugadores[1] if self.sup <= -self.supCas else None
+
+    def inicializar_coeficientes(self):
+        """Especificar valor inicial del coeficiente de superioridad aérea"""
         if self.x < MAPA_DIM_J:
-            self.jugador = g_jugadores[0]
+            self.sup = self.supCas
         elif self.x >= MAPA_DIM_X - MAPA_DIM_J:
-            self.jugador = g_jugadores[1]
+            self.sup = -self.supCas
         else:
-            self.jugador = None
+            self.sup = 0
 
     def recalcular(self):
-        """Recalcular coeficientes de superioridad"""
-
-        # Coeficiente de superioridad de casilla
+        """Determinar coeficiente de superioridad de casilla"""
         infra = self.infraestructura
         self.supCas = infra.SUP + infra.INC * infra.nivel if infra else COEF_SUP
 
-        # Coeficiente de superioridad actual
-        if not self.jugador:
-            self.sup = 0
-        elif self.jugador.indice == 0:
-            self.sup = self.supCas
-        else:
-            self.sup = -self.supCas
+    def ejercer(self, puntos):
+        """Ejercer una cierta cantidad de superioridad aérea sobre la casilla"""
+        self.sup += puntos if g_jugador.indice == 0 else -puntos
+        self.colorear()
 
     def numerar(self):
         """Cambiar el número de la casilla"""
@@ -691,6 +692,14 @@ class Casilla:
             g_jugador.cobrar(self.BONUS)
             return self.BONUS
         return 0
+
+    def construir(self, tipo):
+        """Construir una infraestructura en esta casilla"""
+        infra = tipo(g_jugador, self)
+        self.infraestructura = infra
+        self.recalcular()
+        self.numerar()
+        return infra
 
     def destruir(self):
         """Destruir la infraestructura de la casilla"""
@@ -1393,9 +1402,7 @@ class Jugador:
                     return
             elif not self.pagar(producto.PRECIO):
                 return
-            infra = producto(self, casilla)
-            casilla.infraestructura = infra
-            casilla.numerar()
+            infra = casilla.construir(producto)
             self.infraestructuras.append(infra)
             reproducir_sonido('construir', 'efectos')
             g_info.dinero(f'Has construido una {producto.NOMBRE}')
