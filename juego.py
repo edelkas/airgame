@@ -318,7 +318,34 @@ class Medio:
         """
         pass
 
-class MedioAereo(Medio):
+class MedioAtaque(Medio):
+    """Representa cualquier medio con la capacidad de atacar, ya sea aéreo o anti-aéreo"""
+
+    def __init__(self, jugador, casilla):
+        super().__init__(jugador, casilla)
+        self.ataque_aire = self.DIST_AIRE and self.DIST_AIRE > 0 # Tiene la capacidad de atacar a medios aéreos
+        self.ataque_sup  = self.DIST_SUP  and self.DIST_SUP > 0  # Tiene la capacidad de atacar a medios en superficie
+
+    def radio_ataque(self):
+        """Calcular el radio de ataque en casillas"""
+        coef = 50.0
+
+        # El medio no tiene la capacidad de atacar
+        if not self.ataque_aire and not self.ataque_sup:
+            return -1
+
+        # El medio es de ataque aéreo (p. ej. Caza)
+        if self.ataque_aire:
+            return math.ceil(self.DIST_AIRE / coef)
+
+        # El medio es de ataque superficie (p. ej. Helicóptero)
+        if self.ataque_sup:
+            return math.ceil(self.DIST_SUP / coef)
+
+class MedioEstrategico(Medio):
+    """Representa cualquier medio estratégico (inteligencia, infraestructuras)"""
+
+class MedioAereo(MedioAtaque):
     """Representa cualquier medio aéreo"""
 
     def __init__(self, jugador, casilla):
@@ -371,33 +398,45 @@ class MedioAereo(Medio):
         # Si no pasamos casilla, permitimos que el jugador escoja la casilla
         if not casilla:
             g_jugador.situar_on(self)
-            return False
-
-        # Si pasamos casilla, realizamos el despliegue
-        if self.casilla.distancia(casilla) > self.alcance():
-            emitir_error(f'Este medio tiene un alcance de {self.alcance()} casillas')
             return
+
+        # Chequeamos que la casilla es correcta
+        radio = self.alcance()
+        if self.casilla.distancia(casilla) > radio:
+            emitir_error(f'Este medio tiene un alcance de {radio} casillas')
+            return
+
+        # Realizamos el despliegue
         self.desplegado = True
         self.casilla = casilla
         g_jugador.situar_off()
-        g_info.medio(f"{self.NOMBRE} desplegado (límite {self.autonomia()} turnos)")
-        return True
+        g_info.medio(f"{self.NOMBRE} desplegado en casilla {casilla.id()} (límite {self.autonomia()} turnos)")
 
     def aterrizar(self, auto = False):
         """Retornar el medio aéreo a la base de origen"""
+        # Chequeos para asegurar que es posible aterrizar el medio
         if g_paso != 'Despliegue' and not auto:
             emitir_error('Sólo se pueden retornar medios aéreos en el paso de despliegue')
             return
         if not self.desplegado:
             emitir_error(f'Este {self.NOMBRE} no está desplegado')
             return
+        if self.turnos == 0:
+            emitir_error('No puedes desplegar y aterrizar un medio en el mismo turno')
+            return
+
+        # Aterrizar el avión (ejercer puntos de superioridad, resetear variables...)
         self.desplegado = False
         self.casilla.ejercer(self.sup)
         g_info.medio(f"{self.NOMBRE} retornado{' automáticamente' if auto else ''}")
         self.resetear()
 
-    def atacar(self):
+    def atacar(self, casilla = None):
         """Usar el medio aéreo para atacar otra casilla"""
+        # Chequeos para asegurar que el ataque es posible
+        if not self.ataque_aire and not self.ataque_sup:
+            emitir_error('Este medio no tiene capacidad de ataque')
+            return
         if g_paso != 'Despliegue':
             emitir_error('Sólo se puede atacar con medios aéreos en el paso de despliegue')
             return
@@ -407,8 +446,32 @@ class MedioAereo(Medio):
         if self.atacado:
             emitir_error('Ya has atacado con este medio este turno')
             return
-        g_info.medio(f"Ataque con {self.NOMBRE}")
+
+        # Si no pasamos casilla, permitimos que el jugador escoja la casilla
+        if not casilla:
+            g_jugador.atacar_on(self)
+            return
+
+        # Chequeamos que la casilla es correcta
+        radio = self.radio_ataque()
+        if self.casilla.distancia(casilla) > radio:
+            emitir_error(f'Este medio tiene un radio de ataque de {radio} casillas')
+            return
+
+        # Realizamos el ataque
+        g_jugador.atacar_off()
         self.atacado = True
+        medios = casilla.medios(g_adversario)
+        if self.ataque_aire:
+            medios = [medio for medio in medios if isinstance(medio, MedioAereo) and medio.desplegado]
+        else:
+            medios = [medio for medio in medios if isinstance(medio, MedioAntiaereo)]
+        if len(medios) == 0:
+            g_info.medio(f"Ataque FALLIDO con {self.NOMBRE} en casilla {casilla.id()}")
+            return
+        medio = medios[0]
+        g_info.medio(f"Ataque EXITOSO con {self.NOMBRE} en casilla {casilla.id()} (derribado {medio.NOMBRE})")
+        g_adversario.medios.remove(medio)
 
     def actualizar(self):
         """Ejecutar lógica del medio aéreo"""
@@ -420,11 +483,8 @@ class MedioAereo(Medio):
             else:
                 self.aterrizar(True)
 
-class MedioAntiaereo(Medio):
+class MedioAntiaereo(MedioAtaque):
     """Representa cualquier medio anti-aéreo"""
-
-class MedioEstrategico(Medio):
-    """Representa cualquier medio estratégico"""
 
 class AvionCaza(MedioAereo):
     """Representa un avión de caza"""
@@ -639,6 +699,10 @@ class Casilla:
         self.indicador = Texto('*', (cx + 0.25 * r, cy - 0.85 * r), 12, '#000000', surface = esc.panel.lienzo)
         self.resetear()
 
+    def id(self):
+        """Cadena de texto informativa que identifica a la casilla"""
+        return f"({self.x}, {self.y})"
+
     def resetear(self):
         """Inicializar todas las propiedades y contenidos de la casilla"""
         self.infraestructura = None # Infraestructura construida en esta casilla
@@ -723,9 +787,11 @@ class Casilla:
         infra = self.infraestructura
         return infra and type(infra) is Base and infra.jugador == g_jugador
 
-    def medios(self):
+    def medios(self, jugador = None):
         """Devuelve la lista de medios que el jugador actual tiene en esta casilla (desplegados o no)"""
-        return [medio for medio in g_jugador.medios if medio.casilla == self]
+        if not jugador:
+            jugador = g_jugador
+        return [medio for medio in jugador.medios if medio.casilla == self]
 
     def colorear(self):
         """Determinar color"""
@@ -752,7 +818,7 @@ class Casilla:
         self.numero.dibujar()
         if g_jugador and sum(1 for medio in g_jugador.medios if medio.casilla == self) > 0:
             self.indicador.dibujar()
-        color_borde = MAPA_COLOR_BORDE if not g_jugador or not g_jugador.situando else MAPA_COLOR_BORDE2
+        color_borde = MAPA_COLOR_BORDE if not g_jugador or not g_jugador.situando and not g_jugador.atacando else MAPA_COLOR_BORDE2
         if self.auto >= 0:
             self.bordear(surface, MAPA_COLOR_BORDE3, 1)
         if self.sel:
@@ -786,6 +852,8 @@ class Casilla:
         g_escenario.cambio = True
         if g_jugador and g_jugador.situando:
             g_jugador.situando.desplegar(self)
+        if g_jugador and g_jugador.atacando:
+            g_jugador.atacando.atacar(self)
         reproducir_sonido('casilla_pul', 'interfaz')
 
     def despulsar(self, final = False):
@@ -797,6 +865,7 @@ class Casilla:
         g_escenario.cambio = True
         if g_jugador and final:
             g_jugador.situar_off()
+            g_jugador.atacar_off()
 
     def ayuda(self):
         """Mostrar el recuadro de ayuda al pasar el ratón sobre la casilla"""
@@ -1361,8 +1430,10 @@ class Jugador:
         self.credito          = CREDITO_INICIAL # Crédito disponible (en M$) para gastar en la tienda
         self.preparado        = False           # Ha concluído su fase de preparación
         self.situando         = None            # Ha pulsado "Desplegar" o "Aterrizar" y está situando esta aeronave
+        self.atacando         = None            # Ha pulsado "Atacar" y está escogiendo objetivo para esta aeronave
         self.inteligencia     = 0               # Nivel de inteligencia actualmente contratado
         self.situar_off()
+        self.atacar_off()
 
     def comprar(self, producto):
         """Adquirir un medio y añadirlo al inventario"""
@@ -1370,7 +1441,7 @@ class Jugador:
             return
         if producto in g_tienda.MEDIOS:
             self.medios.append(producto(self, g_escenario.casilla_pulsa))
-        g_info.dinero(f'Has adquirido un {producto.NOMBRE}')
+        g_info.dinero(f'Has adquirido un {producto.NOMBRE} en la casilla {g_escenario.casilla_pulsa.id()}')
         g_escenario.cambio = True
 
     def contratar(self):
@@ -1405,7 +1476,7 @@ class Jugador:
             infra = casilla.construir(producto)
             self.infraestructuras.append(infra)
             reproducir_sonido('construir', 'efectos')
-            g_info.dinero(f'Has construido una {producto.NOMBRE}')
+            g_info.dinero(f'Has construido una {producto.NOMBRE} en la casilla {casilla.id()}')
             g_escenario.cambio = True
 
     def pagar(self, cantidad):
@@ -1447,11 +1518,29 @@ class Jugador:
             return
         for col in g_escenario.casillas:
             for casilla in col:
-                casilla.auto = medio.autonomia(casilla) # medio.base.distancia(casilla) <= medio.alcance()
+                casilla.auto = medio.autonomia(casilla)
 
     def situar_off(self):
         """Terminar de situar un medio en el mapa"""
         self.situando = None
+        if not g_escenario:
+            return
+        for col in g_escenario.casillas:
+            for casilla in col:
+                casilla.auto = -1
+
+    def atacar_on(self, medio):
+        """Comenzar a atacar con un medio"""
+        self.atacando = medio
+        if not g_escenario:
+            return
+        for col in g_escenario.casillas:
+            for casilla in col:
+                casilla.auto = 1 if medio.casilla.distancia(casilla) <= medio.radio_ataque() else -1
+
+    def atacar_off(self):
+        """Terminar de atacar con un medio"""
+        self.atacando = None
         if not g_escenario:
             return
         for col in g_escenario.casillas:
