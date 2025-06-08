@@ -384,6 +384,10 @@ class MedioAtaque(Medio):
             if isinstance(medio, MedioAereo) and medio.detectado(self):
                 medio.detectores.remove(self)
 
+    def puntuar(self):
+        """Devolver los puntos AIRGAME otorgados por este medio"""
+        return self.SUPAEREA
+
 class MedioEstrategico(Medio):
     """Representa cualquier medio estratégico (inteligencia, infraestructuras)"""
 
@@ -641,6 +645,7 @@ class Radar(MedioAntiaereo):
     DIST_SUP   = 0
     VIGILANCIA = 90
     RADIOVIG   = 440
+    SUPAEREA   = 0
 
 class Bateria(MedioAntiaereo):
     """Representa una batería anti-aérea"""
@@ -652,6 +657,7 @@ class Bateria(MedioAntiaereo):
     DIST_SUP   = 0
     VIGILANCIA = 60
     RADIOVIG   = 260
+    SUPAEREA   = 0
 
 class Inteligencia(MedioEstrategico):
     """Clase genérica para representar inteligencia"""
@@ -690,6 +696,10 @@ class Infraestructura(MedioEstrategico):
         self.jugador.cobrar(cantidad)
         return cantidad
 
+    def puntuar(self):
+        """Obtener los puntos AIRGAME correspondientes"""
+        return self.PUNTOS
+
 class Ciudad(Infraestructura):
     """Infraestructura que otorga recursos al jugador"""
     NOMBRE        = "Ciudad"
@@ -701,6 +711,7 @@ class Ciudad(Infraestructura):
     BONUS         = 10
     CANTIDAD      = 2
     COLOR         = "#000000"
+    PUNTOS        = 30
 
 class Base(Infraestructura):
     """Infraestructura que permite desplegar medios aéreos"""
@@ -712,6 +723,7 @@ class Base(Infraestructura):
     SUP           = 60
     CANTIDAD      = 3
     COLOR         = "#00b050"
+    PUNTOS        = 50
 
     def avos(self):
         """Devuelve la lista de medios aéreos del jugador correspondientes a esta base"""
@@ -732,15 +744,17 @@ class Capital(Ciudad):
     COLOR         = "#c09200"
 
 class Casilla:
-    ESCALA  = 0.6
-    BORDE   = 0.9
-    RADIO   = min(ESCALA * ANCHURA * ANCHURA_JUEGO / MAPA_DIM_X, ESCALA * ALTURA * ALTURA_JUEGO / MAPA_DIM_Y)
-    INRADIO = 0.85 * RADIO
-    DIM_X   = RADIO * 3 ** 0.5
-    DIM_Y   = RADIO * 1.5
-    DIM     = pygame.math.Vector2(DIM_X, DIM_Y)
-    BONUS   = 1 # Crédito otorgado al jugador con superioridad aérea en la casilla por turno
-    BONUS_F = 2 # Ídem, pero con supremacía aérea
+    ESCALA   = 0.6
+    BORDE    = 0.9
+    RADIO    = min(ESCALA * ANCHURA * ANCHURA_JUEGO / MAPA_DIM_X, ESCALA * ALTURA * ALTURA_JUEGO / MAPA_DIM_Y)
+    INRADIO  = 0.85 * RADIO
+    DIM_X    = RADIO * 3 ** 0.5
+    DIM_Y    = RADIO * 1.5
+    DIM      = pygame.math.Vector2(DIM_X, DIM_Y)
+    BONUS    = 1 # Crédito otorgado al jugador con superioridad aérea en la casilla por turno
+    BONUS_F  = 2 # Ídem, pero con supremacía aérea
+    PUNTOS   = 1 # Puntos AIRGAME otorgados al final de la partida por una casilla con superioridad aérea
+    PUNTOS_F = 3 # Puntos AIRGAME otorgados al final de la partida por una casilla con supremacía aérea
 
     def __init__(self, esc, x, y):
         self.x = x
@@ -839,6 +853,10 @@ class Casilla:
             g_jugador.cobrar(self.BONUS)
             return self.BONUS
         return 0
+
+    def puntuar(self, jugador):
+        """Otorgar puntos AIRGAME al jugador"""
+        return self.PUNTOS_F if self.hay_supremacia(jugador) else self.PUNTOS if self.hay_superioridad(jugador) else 0
 
     def construir(self, tipo):
         """Construir una infraestructura en esta casilla"""
@@ -1155,6 +1173,10 @@ class Escenario:
         """Adquirir crédito adicional debido a las casillas con superioridad aérea"""
         return sum(casilla.cosechar() for columna in self.casillas for casilla in columna)
 
+    def puntuar(self, jugador):
+        """Calcular puntos AIRGAME totales del jugador"""
+        return sum(casilla.puntuar(jugador) for columna in self.casillas for casilla in columna)
+
     def resetear(self):
         """Resetear los contenidos de todas las celdas"""
         for col in self.casillas:
@@ -1194,6 +1216,7 @@ class Informacion:
             Boton((0,0), texto="Música",    anchura=80, surface=self.panel.lienzo, origen=(x,y), accion=cambiar_musica),
             Boton((0,0), texto="Reglas",    anchura=80, surface=self.panel.lienzo, origen=(x,y), accion=g_reglas.mostrar, audio_pul='puerta_abre'),
             Boton((0,0), texto="Reiniciar", anchura=80, surface=self.panel.lienzo, origen=(x,y), accion=resetear),
+            Boton((0,0), texto="Terminar",  anchura=80, surface=self.panel.lienzo, origen=(x,y), accion=terminar),
             Boton((0,0), texto="Salir",     anchura=80, surface=self.panel.lienzo, origen=(x,y), accion=salir)
         ]
         for i, b in enumerate(reversed(self.botones)):
@@ -1285,11 +1308,11 @@ class Informacion:
 
     def actualizar_texto(self):
         """Actualizar un texto (o todos) y renderizarlo de nuevo"""
-        indice = g_jugador.indice + 1 if g_jugador else 0
-        if g_fase == 'Preparación':
+        indice = g_jugador.indice + 1 if g_jugador else -1
+        if g_fase != 'Principal':
             self.renders['nombres'].editar("Fase:\nTurno:")
             self.renders['valores'].editar(f"{g_fase}\nJugador {indice}")
-        elif g_fase == 'Principal':
+        else:
             self.renders['nombres'].editar("Fase:\nTurno:\nPaso:")
             self.renders['valores'].editar(f"{g_fase}\nJugador {indice}\n{g_paso}")
 
@@ -1605,6 +1628,16 @@ class Jugador:
         if self.cosechado:
             reproducir_sonido('cobrar', 'efectos')
             g_tienda.actualizar_textos()
+
+    def puntuar(self):
+        """Recontar todos los puntos AIRGAME obtenidos en la partida"""
+        puntos = g_escenario.puntuar(self)
+        for infra in self.infraestructuras:
+            puntos += infra.puntuar()
+        for medio in self.medios:
+            puntos += medio.puntuar()
+        g_info.info(f'El jugador {self.indice + 1} ha obtenido {puntos} puntos AIRGAME')
+        return puntos
 
     def preparar(self):
         """Realizar automáticamente la fase de preparación. Esta función está simplemente para facilitar el testeo."""
@@ -2282,6 +2315,10 @@ def emitir_error(texto = None):
         g_info.error(texto)
     reproducir_sonido('error', 'interfaz')
 
+def emitir_fin():
+    """Mensaje de error a emitir cuando la partida ya ha concluido"""
+    emitir_error('La partida ya ha terminado, pulsa "Reiniciar" para comenzar otra')
+
 # < -------------------------------------------------------------------------- >
 #                       ACTUALIZACION DEL ESTADO DEL JUEGO
 # < -------------------------------------------------------------------------- >
@@ -2298,6 +2335,9 @@ def siguiente_fotograma():
 def siguiente_jugador():
     """Cambiar de turno"""
     global g_jugador, g_adversario
+    if g_fase == 'Final':
+        emitir_fin()
+        return
     if not g_jugador:
         g_jugador = g_jugadores[0]
         g_adversario = g_jugadores[1]
@@ -2338,6 +2378,9 @@ def resetear_fase():
 
 def siguiente_paso(manual = True):
     """Avanzar al siguiente paso del turno"""
+    if g_fase == 'Final':
+        emitir_fin()
+        return
     if g_fase != 'Principal':
         emitir_error('Sólo la fase principal tiene pasos')
         return
@@ -2373,8 +2416,9 @@ def actualizar_interfaz():
     """Actualizar los paneles y el contenido del escenario, tienda e información"""
     # Actualizar estado sólo si el escenario es visible
     if not g_reglas.visible:
-        g_escenario.actualizar()
-        g_tienda.actualizar()
+        if g_fase != 'Final':
+            g_escenario.actualizar()
+            g_tienda.actualizar()
         g_info.actualizar()
 
     # Dibujar contenido de los paneles
@@ -2383,7 +2427,8 @@ def actualizar_interfaz():
     g_info.dibujar()
 
     # Paneles adicionales opcionales
-    g_ayuda.dibujar()
+    if g_fase != 'Final':
+        g_ayuda.dibujar()
     if g_reglas.visible:
         actualizar_fase_reglas()
 
@@ -2437,6 +2482,10 @@ def actualizar_fase_principal():
         actualizar_paso_recursos()
     elif g_paso == 'Despliegue':
         actualizar_paso_despliegue()
+
+def actualizar_fase_final():
+    """Actualizar estado en la fase final (partida terminada)"""
+    actualizar_interfaz()
 
 def actualizar_paso_reporte():
     """Desarrollar el paso de reporte. El jugador recibe un reporte
@@ -2512,6 +2561,11 @@ def verificar_turno():
     return True
 
 def resetear():
+    """
+        Resetear la partida por completo.
+        Tenemos que reinicializar todos los objetos del juego.
+        El orden puede ser importante.
+    """
     global g_jugador
     for jugador in g_jugadores:
         jugador.resetear()
@@ -2522,6 +2576,19 @@ def resetear():
     resetear_fase()
     g_jugador = None
     siguiente_jugador()
+
+def terminar():
+    """Terminar la partida, realizar el conteo de puntos y determinar el ganador"""
+    if g_fase == 'Final':
+        emitir_fin()
+        return
+    cambiar_fase('Final')
+    g_info.info('Partida terminada')
+    puntos = [jugador.puntuar() for jugador in g_jugadores]
+    if puntos[0] == puntos[1]:
+        g_info.info('¡Los jugadores han empatado!')
+    else:
+        g_info.info(f'¡Victoria para el jugador {puntos.index(max(puntos)) + 1}!')
 
 def salir():
     pygame.event.post(pygame.event.Event(pygame.QUIT))
@@ -2613,6 +2680,6 @@ while True:
     elif g_fase == 'Principal':           # Fase central del juego
         actualizar_fase_principal()
     else:
-        cambiar_fase('Pantallazo')
+        actualizar_fase_final()           # Partida terminada
 
     siguiente_fotograma()
