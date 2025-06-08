@@ -53,9 +53,9 @@ FPS                             = 60        # Fotogramas por segundo
 COLOR_FONDO                     = "#cccccc" # Color RGB del fondo de pantalla
 
 # Configuraciones
-MUSICA_REPRODUCIR  = False # Activar o desactivar la música por defecto
+MUSICA_REPRODUCIR  = True  # Activar o desactivar la música por defecto
 MUSICA_VOLUMEN     = 0.5   # Volumen relativo de la musica (0.0 - 1.0)
-SALTAR_PREPARACION = True  # Saltar la primera fase, útil para testear
+SALTAR_PREPARACION = False # Saltar la primera fase, útil para testear
 
 # Carpetas de ficheros del juego
 CARPETA_AUDIO      = "audio" # Localización de los sonidos y música
@@ -280,8 +280,10 @@ class Medio:
     def info(cls):
 
         # Información breve en la ayuda del ratón
-        texto_ayuda = f"{cls.NOMBRE} ({cls.PRECIO}M)"
-        if issubclass(cls, Infraestructura):
+        texto_ayuda = cls.NOMBRE
+        if cls.PRECIO:
+            texto_ayuda += f" ({cls.PRECIO}M)"
+        if cls.PRECIO_MEJORA:
             casilla = g_escenario.casilla_pulsa
             if casilla and casilla.infraestructura:
                 infra = casilla.infraestructura
@@ -668,9 +670,10 @@ class Inteligencia(MedioEstrategico):
 
 class Infraestructura(MedioEstrategico):
     """Clase genérica que representa una infraestructura"""
-    INC     = 5 # Incremento del coeficiente de superioridad por cada nivel extra
-    BONUS   = 0 # Crédito (en M) otorgado al jugador por turno y nivel
-    NIVELES = 9 # Maximo nivel de una infraestructura
+    INC     = 5   # Incremento del coeficiente de superioridad por cada nivel extra
+    BONUS   = 0   # Crédito (en M) otorgado al jugador por turno y nivel
+    NIVELES = 9   # Maximo nivel de una infraestructura
+    PRECIO  = 200 # Precio de construcción
 
     def __init__(self, jugador, casilla):
         super().__init__(jugador, casilla)
@@ -685,9 +688,13 @@ class Infraestructura(MedioEstrategico):
 
     def mejorar(self):
         """Mejorar el nivel y las propiedades de la infraestructura"""
+        if self.nivel == self.NIVELES:
+            emitir_error(f'Esta {self.NOMBRE} ya está al máximo nivel')
+            return
         if self.jugador.pagar(self.PRECIO_MEJORA):
             self.nivel += 1
             reproducir_sonido('construir', 'efectos')
+            g_info.medio(f'Has mejorado tu {self.NOMBRE} de la casilla {self.casilla.id()} a nivel {self.nivel}')
             self.casilla.numerar()
 
     def cosechar(self):
@@ -705,7 +712,6 @@ class Ciudad(Infraestructura):
     NOMBRE        = "Ciudad"
     ICONO         = g_iconos['Ciudad']
     DESC          = "Infraestructura que cosecha recursos cada turno."
-    PRECIO        = 200
     PRECIO_MEJORA = 100
     SUP           = 40
     BONUS         = 10
@@ -718,7 +724,6 @@ class Base(Infraestructura):
     NOMBRE        = "Base aérea"
     ICONO         = g_iconos['Base']
     DESC          = "Infraestructura que permite desplegar medios aéreos."
-    PRECIO        = 300
     PRECIO_MEJORA = 150
     SUP           = 60
     CANTIDAD      = 3
@@ -737,8 +742,8 @@ class Capital(Ciudad):
     """Ciudad principal del jugador. Además, perderla implica perder la partida."""
     NOMBRE        = "Capital"
     DESC          = "Ciudad principal del jugador. Conquistarla implica ganar la partida."
-    PRECIO        = 500
-    PRECIO_MEJORA = 250
+    PRECIO        = None
+    PRECIO_MEJORA = None
     SUP           = 100
     CANTIDAD      = 1
     COLOR         = "#c09200"
@@ -780,7 +785,7 @@ class Casilla:
 
     def id(self):
         """Cadena de texto informativa que identifica a la casilla"""
-        return f"({self.x}, {self.y})"
+        return f"({self.x + 1}, {MAPA_DIM_Y - self.y})"
 
     def resetear(self):
         """Inicializar todas las propiedades y contenidos de la casilla"""
@@ -843,6 +848,7 @@ class Casilla:
         self.numero.editar(str(self.infraestructura.nivel))
         self.numero.colorear(self.infraestructura.COLOR)
         self.numero.mostrar()
+        g_escenario.cambio = True
 
     def cosechar(self):
         """Otorgar bonus de crédito al jugador"""
@@ -1602,7 +1608,7 @@ class Jugador:
             infra = casilla.construir(producto)
             self.infraestructuras.append(infra)
             reproducir_sonido('construir', 'efectos')
-            g_info.dinero(f'Has construido una {producto.NOMBRE} en la casilla {casilla.id()}')
+            g_info.medio(f'Has construido una {producto.NOMBRE} en la casilla {casilla.id()}')
             g_escenario.cambio = True
 
     def pagar(self, cantidad):
@@ -1788,11 +1794,11 @@ class Tienda:
                 boton.mostrar()
 
             # Condiciones para que el botón esté activo
-            if g_fase != 'Principal':
-                boton.bloquear('Sólo se pueden adquirir medios en la fase principal')
-            elif g_paso != 'Recursos':
-                boton.bloquear('Sólo se pueden adquirir medios en el paso de recursos')
-            elif not casilla or not casilla.hay_supremacia():
+            if g_fase != 'Preparación' and g_fase != 'Principal':
+                boton.bloquear('Sólo se pueden construir infraestructuras en las fases de preparación y principal')
+            elif g_fase == 'Principal' and g_paso != 'Recursos':
+                boton.bloquear('Sólo se pueden construir infraestructuras en el paso de recursos')
+            elif not casilla or not casilla.infraestructura and not casilla.hay_supremacia():
                 boton.bloquear('Sólo se pueden construir infraestructuras en casillas con supremacía aérea')
             else:
                 boton.desbloquear()
