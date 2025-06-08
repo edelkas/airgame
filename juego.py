@@ -320,34 +320,69 @@ class Medio:
 
 class MedioAtaque(Medio):
     """Representa cualquier medio con la capacidad de atacar, ya sea aéreo o anti-aéreo"""
+    ESCALA = 50.0 # Kilómetros por casilla, para convertir los datos
 
     def __init__(self, jugador, casilla):
         super().__init__(jugador, casilla)
         self.ataque_aire = self.DIST_AIRE and self.DIST_AIRE > 0 # Tiene la capacidad de atacar a medios aéreos
-        self.ataque_sup  = self.DIST_SUP  and self.DIST_SUP > 0  # Tiene la capacidad de atacar a medios en superficie
+        self.ataque_sup  = self.DIST_SUP  and self.DIST_SUP  > 0 # Tiene la capacidad de atacar a medios en superficie
+        self.vigilancia  = self.RADIOVIG  and self.RADIOVIG  > 0 # Tiene la capacidad de vigilar su entorno
 
     def radio_ataque(self):
         """Calcular el radio de ataque en casillas"""
-        coef = 50.0
-
         # El medio no tiene la capacidad de atacar
         if not self.ataque_aire and not self.ataque_sup:
             return -1
 
         # El medio es de ataque aéreo (p. ej. Caza)
         if self.ataque_aire:
-            return math.ceil(self.DIST_AIRE / coef)
+            return math.ceil(self.DIST_AIRE / self.ESCALA)
 
         # El medio es de ataque superficie (p. ej. Helicóptero)
         if self.ataque_sup:
-            return math.ceil(self.DIST_SUP / coef)
+            return math.ceil(self.DIST_SUP / self.ESCALA)
 
-    def destruir(self):
-        """Destruir el medio como consecuencia de un ataque"""
-        if isinstance(self, MedioAereo): # Ejercer puntos de superioridad
+    def radio_vigilancia(self):
+        """Calcular el radio de vigilancia en casillas"""
+        if not self.vigilancia:
+            return -1
+        return math.ceil(self.RADIOVIG / self.ESCALA)
+
+    def vigilar(self):
+        """
+            Escanear las casillas dentro del radio de vigilancia para intentar
+            detectar medios aéreos enemigos no detectados aún.
+        """
+        if not self.vigilancia:
+            return
+        avos = [medio for medio in self.jugador.adversario().medios if isinstance(medio, MedioAereo) and medio.vigilado(self) and not medio.detectado(self)]
+        for avo in avos:
+            if random.random() <= (self.VIGILANCIA / 100.0) * (avo.HUELLA / 100.0):
+                avo.detectar(self)
+
+    def destruir(self, manual, verdugo):
+        """
+            Destruir el medio como consecuencia de un ataque.
+            El ataque manual es el efectuado por aeronaves. El automático es el efectuado por medios antiaéreos.
+        """
+
+        # Si se trata de un medio aéreo, ejercer puntos de superioridad
+        if isinstance(self, MedioAereo):
             self.casilla.ejercer(self.sup)
-        g_adversario.reportar(f"Tu {self.NOMBRE} fue derribado en la casilla {self.casilla.id()}")
-        self.jugador.medios.remove(self) # Eliminar medio del inventario
+
+        # Reportar información (ahora o después) a ambos jugadores
+        mensaje = f"Derribado {self.NOMBRE} enemigo con {verdugo.NOMBRE} en casilla {self.casilla.id()}"
+        if manual:
+            g_info.medio(mensaje)
+        else:
+            verdugo.jugador.reportar(mensaje)
+        self.jugador.reportar(f"Tu {self.NOMBRE} fue derribado en la casilla {self.casilla.id()}")
+
+        # Eliminar medio del juego
+        self.jugador.medios.remove(self)
+        for medio in self.jugador.adversario().medios:
+            if isinstance(medio, MedioAereo) and medio.detectado(self):
+                medio.detectores.remove(self)
 
 class MedioEstrategico(Medio):
     """Representa cualquier medio estratégico (inteligencia, infraestructuras)"""
@@ -364,6 +399,7 @@ class MedioAereo(MedioAtaque):
             Boton((0,0), texto="R", anchura=20, origen=(x,y), info=lambda: g_ayuda.cambiar('Retornar'),  surface=g_escenario.panel.lienzo, accion=self.aterrizar),
             Boton((0,0), texto="A", anchura=20, origen=(x,y), info=lambda: g_ayuda.cambiar('Atacar'),    surface=g_escenario.panel.lienzo, accion=self.atacar)
         ]
+        self.detectores = [] # Lista de medios que han detectado a este medio
         self.resetear()
 
     def resetear(self):
@@ -474,12 +510,33 @@ class MedioAereo(MedioAtaque):
         else:
             medios = [medio for medio in medios if isinstance(medio, MedioAntiaereo)]
         if len(medios) == 0:
-            g_info.medio(f"Ataque FALLIDO con {self.NOMBRE} en casilla {casilla.id()}")
+            g_info.medio(f"Ataque fallido con {self.NOMBRE} en casilla {casilla.id()}")
             g_adversario.reportar(f"Ataque adversario fallido a la casilla {casilla.id()}")
             return
-        medio = medios[0]
-        g_info.medio(f"Ataque EXITOSO con {self.NOMBRE} en casilla {casilla.id()} (derribado {medio.NOMBRE})")
-        medio.destruir()
+        for medio in medios:
+            medio.destruir(True, self)
+
+    def detectar(self, medio):
+        """Hemos sido detectados por el medio"""
+        self.detectores.append(medio)
+        medio.jugador.reportar(f"Detectado {self.NOMBRE} enemigo en la casilla {self.casilla.id()}")
+        if type(medio) is Bateria:
+            self.destruir(False, medio)
+
+    def detectado(self, medio):
+        """Determinar si hemos sido detectados por el medio"""
+        return medio in self.detectores
+
+    def vigilado(self, medio):
+        """Determinar si estamos dentro del radio de vigilancia del medio"""
+        return self.casilla.distancia(medio.casilla) <= medio.radio_vigilancia()
+
+    def visible(self):
+        """
+            Devuelve si el medio es actualmente visible por el adversario porque
+            está dentro del radio de vigilancia de un medio que ya lo ha detectado
+        """
+        return sum(1 for medio in self.detectores if self.vigilado(medio)) > 0
 
     def actualizar(self):
         """Ejecutar lógica del medio aéreo"""
@@ -580,7 +637,6 @@ class Radar(MedioAntiaereo):
     ICONO      = g_iconos['Radar']
     DESC       = 'Medio antiaéreo con el mayor alcance de vigilancia.'
     PRECIO     = 24
-    HUELLA     = 100
     DIST_AIRE  = 0
     DIST_SUP   = 0
     VIGILANCIA = 90
@@ -592,7 +648,6 @@ class Bateria(MedioAntiaereo):
     ICONO      = g_iconos['Bateria']
     DESC       = 'Único medio antiaéreo con capacidad de vigilancia.'
     PRECIO     = 90
-    HUELLA     = 100
     DIST_AIRE  = 240
     DIST_SUP   = 0
     VIGILANCIA = 60
@@ -669,6 +724,7 @@ class Base(Infraestructura):
 class Capital(Ciudad):
     """Ciudad principal del jugador. Además, perderla implica perder la partida."""
     NOMBRE        = "Capital"
+    DESC          = "Ciudad principal del jugador. Conquistarla implica ganar la partida."
     PRECIO        = 500
     PRECIO_MEJORA = 250
     SUP           = 100
@@ -704,7 +760,8 @@ class Casilla:
             negrita = True,
             surface = esc.panel.lienzo
         )
-        self.indicador = Texto('*', (cx + 0.25 * r, cy - 0.85 * r), 12, '#000000', surface = esc.panel.lienzo)
+        self.indicador  = Texto('*', (cx + 0.25 * r, cy - 0.85 * r), 12, '#000000', surface = esc.panel.lienzo)
+        self.indicador2 = Texto('!', (cx - 0.75 * r, cy - 0.85 * r), 12, '#000000', surface = esc.panel.lienzo)
         self.resetear()
 
     def id(self):
@@ -788,6 +845,7 @@ class Casilla:
         infra = tipo(g_jugador, self)
         self.infraestructura = infra
         self.recalcular()
+        self.sup = round((self.sup / abs(self.sup)) * self.supCas)
         self.numerar()
         return infra
 
@@ -842,12 +900,20 @@ class Casilla:
 
     def dibujar(self, surface):
         """Dibujar casilla en pantalla"""
+
+        # Hexágono e indicador de infraestructura
         pygame.draw.polygon(surface, self.color, self.verts)
         if self.infraestructura:
             self.bordear(surface, self.infraestructura.COLOR, 4)
-        self.numero.dibujar()
+            self.numero.dibujar()
+
+        # Indicadores de medios (propios y enemigos detectados)
         if g_jugador and sum(1 for medio in g_jugador.medios if medio.casilla == self) > 0:
             self.indicador.dibujar()
+        if g_adversario and sum(1 for medio in g_adversario.medios if medio.casilla == self and isinstance(medio, MedioAereo) and medio.visible()) > 0:
+            self.indicador2.dibujar()
+
+        # Bordes de selección
         color_borde = MAPA_COLOR_BORDE if not g_jugador or not g_jugador.situando and not g_jugador.atacando else MAPA_COLOR_BORDE2
         if self.auto >= 0:
             self.bordear(surface, MAPA_COLOR_BORDE3, 1)
@@ -1101,13 +1167,13 @@ class Escenario:
 class Informacion:
     TAMANO_TEXTO   = 14        # Tamaño de la fuente empleada en el panel
     TAMANO_TITULO  = 24        # Tamaño de la fuente de los títulos grandes
-    MENSAJE_LIMITE = 10        # Limite de mensajes de error (o similares) en pantalla
+    MENSAJE_LIMITE = 12        # Limite de mensajes de error (o similares) en pantalla
     COLOR_ERROR    = '#c00000' # Color del texto "Error"
     COLOR_INFO     = '#0000c0' # Color del texto "Info"
     COLOR_DINERO   = '#c0c000' # Color del texto "Dinero"
     COLOR_INTEL    = '#00c000' # Color del texto "Intel"
     COLOR_MEDIO    = '#c000c0' # Color del texto "Medio"
-    COLOR_ALT      = '#00c0c0' # Color reservado
+    COLOR_REPORTE  = '#00c0c0' # Color del texto "Reporte"
     ANCHURA        = 550       # Anchura en píxeles de la sección de información
 
     """Representa el panel informativo"""
@@ -1163,7 +1229,8 @@ class Informacion:
             'info':   self.COLOR_INFO,
             'dinero': self.COLOR_DINERO,
             'intel':  self.COLOR_INTEL,
-            'medio':  self.COLOR_MEDIO
+            'medio':  self.COLOR_MEDIO,
+            'report': self.COLOR_REPORTE
         }[tipo]
         cabecera = tipo.capitalize() + ':'
         imagen1 = Texto(cabecera, (0, 0), self.TAMANO_TEXTO, surface = self.panel.lienzo, color = color, negrita = True)
@@ -1176,7 +1243,7 @@ class Informacion:
 
         # Recolocar textos correctamente para que se vayan moviendo para abajo
         dy0 = g_fuentes[self.TAMANO_TITULO].get_linesize()
-        dy = g_fuentes[self.TAMANO_TEXTO].get_linesize()
+        dy = g_fuentes[self.TAMANO_TEXTO].get_linesize() - 1
         for i, texto in enumerate(self.mensajes):
             texto.mover((self.ANCHURA + 20 + 50 * (i % 2), dy0 + (i // 2) * dy))
 
@@ -1202,6 +1269,10 @@ class Informacion:
     def medio(self, texto):
         """Guardar un mensaje relacionado con acciones de medios (ataques, despliegues...)"""
         self.añadir_mensaje('medio', texto)
+
+    def reporte(self, texto):
+        """Guardar un mensaje relacionado con el reporte inicial"""
+        self.añadir_mensaje('report', texto)
 
     def actualizar(self):
         """Actualizar los contenidos del panel. Llamar cada fotograma."""
@@ -1455,8 +1526,8 @@ class Jugador:
 
     def resetear(self):
         """Reiniciar el estado del jugador"""
-        self.medios           = []              # Lista completa de medios comprados
-        self.infraestructuras = []              # Lista completa de infraestructuras construidas
+        self.medios           = []              # Lista de medios de ataque (aéreos o antiaéreos) adquiridos (y no destruidos)
+        self.infraestructuras = []              # Lista de infraestructuras construidas
         self.reporte          = []              # Lista de acciones hechas por el adversario en el turno anterior
         self.credito          = CREDITO_INICIAL # Crédito disponible (en M$) para gastar en la tienda
         self.cosechado        = 0               # Crédito obtenido en el último turno
@@ -1468,11 +1539,12 @@ class Jugador:
         self.atacar_off()
 
     def comprar(self, producto):
-        """Adquirir un medio y añadirlo al inventario"""
+        """Adquirir un medio de ataque (aéreo o antiaéreo) y añadirlo al inventario"""
         if not self.pagar(producto.PRECIO):
             return
-        if producto in g_tienda.MEDIOS:
-            self.medios.append(producto(self, g_escenario.casilla_pulsa))
+        if not issubclass(producto, MedioAtaque):
+            return
+        self.medios.append(producto(self, g_escenario.casilla_pulsa))
         g_info.dinero(f'Has adquirido un {producto.NOMBRE} en la casilla {g_escenario.casilla_pulsa.id()}')
         g_escenario.cambio = True
 
@@ -1484,7 +1556,6 @@ class Jugador:
             return
         else:
             self.inteligencia += 1
-            self.medios.append(Inteligencia(self))
             g_info.info(f'Contrada inteligencia de nivel {self.inteligencia}')
 
     def construir(self, producto, casilla):
@@ -1590,6 +1661,10 @@ class Jugador:
         """Ejecutar una vez vistos los reportes"""
         self.reporte = []
 
+    def adversario(self):
+        """Devolver el adversario de este jugador"""
+        return g_jugadores[self.indice ^ 1]
+
 class Tienda:
     """Contiene todos los productos que se pueden adquirir y se encarga de su funcionalidad y renderizado"""
     BOTON_SEP = 5
@@ -1630,12 +1705,12 @@ class Tienda:
         """Crear cada uno de los botones de la tienda"""
         accion = None
         args = ()
-        if producto == Inteligencia:
+        if producto is Inteligencia:
             accion = lambda: g_jugador.contratar()
-        elif producto in self.MEDIOS:
+        elif issubclass(producto, MedioAtaque):
             accion = lambda p: g_jugador.comprar(p)
             args = (producto,)
-        else:
+        elif issubclass(producto, Infraestructura):
             accion = lambda: g_jugador.construir(producto, g_escenario.casilla_pulsa)
         return Boton((0, 0), imagen=producto.ICONO, info=producto.info, indice=0, accion=accion, args=args, audio_pul=None)
 
@@ -1650,6 +1725,8 @@ class Tienda:
         # Actualizar botones de medios
         for medio in self.MEDIOS:
             boton = self.botones[medio]
+
+            # Condiciones para que el botón es activo
             if g_fase != 'Principal':
                 boton.bloquear('Sólo se pueden adquirir medios en la fase principal')
             elif g_paso != 'Recursos':
@@ -1660,6 +1737,8 @@ class Tienda:
                 boton.bloquear('Los medios antiaéreos han de ser colocados en casillas con superioridad aérea')
             else:
                 boton.desbloquear()
+
+            # Actualizar botón y ayuda
             boton.indexar(sum(1 for producto in g_jugador.medios if type(producto) is medio))
             boton.actualizar()
             if boton.selec:
@@ -1668,6 +1747,14 @@ class Tienda:
         # Actualizar botones de infraestructuras
         for infra in self.INFRAESTRUCTURAS:
             boton = self.botones[infra]
+
+            # La capital sólo puede colocarse en la fase de preparación
+            if g_fase != 'Preparación' and infra is Capital:
+                boton.ocultar()
+            else:
+                boton.mostrar()
+
+            # Condiciones para que el botón esté activo
             if g_fase != 'Principal':
                 boton.bloquear('Sólo se pueden adquirir medios en la fase principal')
             elif g_paso != 'Recursos':
@@ -1676,6 +1763,8 @@ class Tienda:
                 boton.bloquear('Sólo se pueden construir infraestructuras en casillas con supremacía aérea')
             else:
                 boton.desbloquear()
+
+            # Actualizar botón y ayuda
             boton.indexar(sum(1 for producto in g_jugador.infraestructuras if type(producto) is infra))
             boton.actualizar()
             if boton.selec:
@@ -2353,8 +2442,8 @@ def actualizar_paso_reporte():
     """Desarrollar el paso de reporte. El jugador recibe un reporte
     informativo del movimiento del adversario."""
     global g_paso_listo
-    for reporte in g_jugador.reporte:
-        g_info.info(reporte)
+    for reporte in set(g_jugador.reporte):
+        g_info.reporte(reporte)
     g_jugador.validar_reporte()
     g_paso_listo = True
 
@@ -2404,6 +2493,7 @@ def actualizar_paso_despliegue():
 def verificar_turno():
     """Comprobar que el jugador ha realizado un turno válido y podemos pasar al siguiente"""
     if g_fase == "Preparación":
+        # Verificar que se han construido las infraestructuras iniciales necesarias
         cantidades = { Capital: 0, Ciudad: 0, Base: 0 }
         for infra in g_jugador.infraestructuras:
             cantidades[type(infra)] += 1
@@ -2412,8 +2502,13 @@ def verificar_turno():
             return False
         g_jugador.preparado = True
     elif g_fase == 'Principal':
+        # Actualizar los medios aéreos del jugador (turnos, aterrizajes automáticos...)
         for medio in g_jugador.medios:
-            medio.actualizar()
+            if isinstance(medio, MedioAereo):
+                medio.actualizar()
+        # Llevar a cabo vigilancias de los medios del adversario
+        for medio in g_adversario.medios:
+            medio.vigilar()
     return True
 
 def resetear():
