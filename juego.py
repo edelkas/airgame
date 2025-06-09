@@ -43,6 +43,7 @@ os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
 # Constantes generales del juego
 NOMBRE_JUEGO    = "AIR GAME"
 CREDITO_INICIAL = 500
+MULTIJUGADOR    = True
 
 # Características generales de la interfaz
 ANCHURA                         = 1280      # Anchura de la ventana en pixeles
@@ -1250,6 +1251,9 @@ class Informacion:
     def añadir_mensaje(self, tipo, texto):
         """Añadir un mensaje al panel y renderizarlo"""
 
+        if g_jugador and g_jugador.ia:
+            return
+
         # Configurar texto
         if g_jugador:
             texto = f'[J{g_jugador.indice + 1}] {texto}'
@@ -1548,8 +1552,9 @@ class Jugador:
 
     jugadores = 0
 
-    def __init__(self):
-        self.indice = self.jugadores
+    def __init__(self, ia):
+        self.indice = self.jugadores # Índice numérico del jugador (0, 1)
+        self.ia     = ia             # Si el jugador es IA o no
         type(self).jugadores += 1
         self.resetear()
 
@@ -1703,6 +1708,22 @@ class Jugador:
     def adversario(self):
         """Devolver el adversario de este jugador"""
         return g_jugadores[self.indice ^ 1]
+
+    def ia_comprar(self):
+        """Decidir qué recursos adquirir en el turno de la IA"""
+        pass
+
+    def ia_construir(self):
+        """Decidir qué infraestructuras construir en el turno de la IA"""
+        pass
+
+    def ia_desplegar(self):
+        """Decidir dónde desplegar un medio en el turno de la IA"""
+        pass
+
+    def ia_ataque(self):
+        """Decidir qué ataque llevar a cabo en el turno de la IA"""
+        pass
 
 class Tienda:
     """Contiene todos los productos que se pueden adquirir y se encarga de su funcionalidad y renderizado"""
@@ -2456,7 +2477,7 @@ def actualizar_fase_preparacion():
         siguiente_jugador()
 
     # Saltar la fase preparatoria, para testear
-    if SALTAR_PREPARACION:
+    if SALTAR_PREPARACION or g_jugador.ia:
         g_jugador.preparar()
         siguiente_jugador()
         return
@@ -2632,7 +2653,7 @@ g_pasos = ['Reporte', 'Inteligencia', 'Ingresos', 'Recursos', 'Despliegue']
 cambiar_fase('Pantallazo')
 
 # Jugadores de la partida
-g_jugadores  = [Jugador() for _ in range(2)]
+g_jugadores  = [Jugador(False), Jugador(not MULTIJUGADOR)]
 
 # Principales partes de la interfaz (no cambiar estas líneas de orden!)
 g_reglas    = Reglamento()
