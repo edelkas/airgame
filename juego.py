@@ -419,7 +419,7 @@ class MedioAereo(MedioAtaque):
 
     def alcance(self):
         """Calcular el alcance en casillas"""
-        return 2 * math.ceil(self.ALCANCE / 1000.0)
+        return  math.ceil((self.ALCANCE / 200) - 2)
 
     def autonomia(self, casilla = None):
         """
@@ -563,12 +563,12 @@ class AvionCaza(MedioAereo):
     NOMBRE     = "Avo. Caza"
     ICONO      = g_iconos['AvionCaza']
     DESC       = 'Único medio aéreo que puede atacar otros medios aéreos. El otro medio que puede hacerlo es la batería antiaérea.'
-    PRECIO     = 50
-    VELOCIDAD  = 2100
-    AUTONOMIA  = 1.62
-    ALCANCE    = 3400
-    HUELLA     = 4
-    DIST_AIRE  = 170
+    PRECIO     = 67
+    VELOCIDAD  = 2301
+    AUTONOMIA  = 1.42
+    ALCANCE    = 3269
+    HUELLA     = 13.12
+    DIST_AIRE  = 160
     DIST_SUP   = 0
     VIGILANCIA = 0
     RADIOVIG   = 0
@@ -579,13 +579,13 @@ class AvionAtaque(MedioAereo):
     NOMBRE     = "Avo. Ataque"
     ICONO      = g_iconos['AvionAtaque']
     DESC       = 'Medio aéreo capaz de atacar medios anti aéreos.'
-    PRECIO     = 65
-    VELOCIDAD  = 1350
-    AUTONOMIA  = 5.04
-    ALCANCE    = 6800
-    HUELLA     = 15
+    PRECIO     = 142
+    VELOCIDAD  = 1363
+    AUTONOMIA  = 4.44
+    ALCANCE    = 6057
+    HUELLA     = 46
     DIST_AIRE  = 0
-    DIST_SUP   = 240
+    DIST_SUP   = 1122.98
     VIGILANCIA = 0
     RADIOVIG   = 0
     SUPAEREA   = 6
@@ -595,11 +595,11 @@ class AvionTransporte(MedioAereo):
     NOMBRE     = "Avo. Transporte"
     ICONO      = g_iconos['AvionTransporte']
     DESC       = 'Medio aéreo con más alcance.'
-    PRECIO     = 120
-    VELOCIDAD  = 820
-    AUTONOMIA  = 12.93
-    ALCANCE    = 10600
-    HUELLA     = 60
+    PRECIO     = 101
+    VELOCIDAD  = 785
+    AUTONOMIA  = 10.94
+    ALCANCE    = 8588
+    HUELLA     = 100
     DIST_AIRE  = 0
     DIST_SUP   = 0
     VIGILANCIA = 0
@@ -611,13 +611,13 @@ class Helicoptero(MedioAereo):
     NOMBRE     = "Helicóptero"
     ICONO      = g_iconos['Helicoptero']
     DESC       = 'Único medio aéreo capaz de aterrizar en una casilla que no sea una base. Además es capaz de atacar medios anti aéreos.'
-    PRECIO     = 21
-    VELOCIDAD  = 260
-    AUTONOMIA  = 2.58
-    ALCANCE    = 670
-    HUELLA     = 10
+    PRECIO     = 24
+    VELOCIDAD  = 290
+    AUTONOMIA  = 2
+    ALCANCE    = 597
+    HUELLA     = 20
     DIST_AIRE  = 0
-    DIST_SUP   = 10
+    DIST_SUP   = 51
     VIGILANCIA = 0
     RADIOVIG   = 0
     SUPAEREA   = 4
@@ -627,15 +627,15 @@ class Dron(MedioAereo):
     NOMBRE     = "Dron"
     ICONO      = g_iconos['Dron']
     DESC       = 'Único medio aéreo con capacidad de vigilancia y con mayor autonomía, además es capaz de atacar medios anti aéreos.'
-    PRECIO     = 25
-    VELOCIDAD  = 240
-    AUTONOMIA  = 13.5
-    ALCANCE    = 3240
-    HUELLA     = 2
+    PRECIO     = 17
+    VELOCIDAD  = 450
+    AUTONOMIA  = 8
+    ALCANCE    = 3414
+    HUELLA     = 16.39
     DIST_AIRE  = 0
-    DIST_SUP   = 100
-    VIGILANCIA = 20
-    RADIOVIG   = 240
+    DIST_SUP   = 51
+    VIGILANCIA = 32.78
+    RADIOVIG   = 230
     SUPAEREA   = 2
 
 class Radar(MedioAntiaereo):
@@ -643,11 +643,11 @@ class Radar(MedioAntiaereo):
     NOMBRE     = "Radar"
     ICONO      = g_iconos['Radar']
     DESC       = 'Medio antiaéreo con el mayor alcance de vigilancia.'
-    PRECIO     = 24
+    PRECIO     = 48
     DIST_AIRE  = 0
     DIST_SUP   = 0
     VIGILANCIA = 90
-    RADIOVIG   = 440
+    RADIOVIG   = 360
     SUPAEREA   = 0
 
 class Bateria(MedioAntiaereo):
@@ -655,11 +655,11 @@ class Bateria(MedioAntiaereo):
     NOMBRE     = "Batería"
     ICONO      = g_iconos['Bateria']
     DESC       = 'Único medio antiaéreo con capacidad de vigilancia.'
-    PRECIO     = 90
-    DIST_AIRE  = 240
+    PRECIO     = 206
+    DIST_AIRE  = 0
     DIST_SUP   = 0
     VIGILANCIA = 60
-    RADIOVIG   = 260
+    RADIOVIG   = 160
     SUPAEREA   = 0
 
 class Inteligencia(MedioEstrategico):
@@ -1357,98 +1357,130 @@ class Reglamento:
     """Representa el conjunto de reglas, para el pantallazo inicial"""
 
     REGLAS = """
-    AIRGAME es un juego de estrategia basado en medios militares aéreos. El objetivo del juego es obtener mayor superioridad aérea que el oponente. Dicha superioridad se conseguirá mediante el empleo de diversas aeronaves y medios a lo largo del tablero establecido.
-    ¿Cómo se consigue la superioridad aérea?
+    AIRGAME es un juego de estrategia cuyo objetivo es obtener la superioridad aérea mediante la utilización de medios aéreos, antiaéreos y otros elementos propios del entorno bélico aeroespacial.
+    SUPERIORIDAD AÉREA
+        -    ¿Cómo se consigue?
     Durante el desarrollo del juego, la superioridad aérea (Sup.A) se conseguirá al desplegar aeronaves a lo largo del tablero. Cada medio aéreo posee un coeficiente de Sup.A que se hará efectivo cuando permanezca en una casilla determinada.
-    Ejemplo: Si una aeronave del jugador 1(J1) con coeficiente de Sup.A = 5, permanece durante dos turnos en una casilla, a esta se le sumarán 10 puntos de Sup.A de J1. (5 Sup.A x 2 turnos = 10)
+    Ejemplo: Si una aeronave del jugador 1 (J1) con coeficiente de Sup.A = 5, permanece durante dos turnos en una casilla, a esta se le sumarán 10 puntos de Sup.A de J1. (5 Sup.A x 2 turnos = 10)
     Al inicio del juego, cada casilla tendrá asociada un coeficiente de Sup.A de casilla y otro actual:
-        -Coeficiente de superioridad de casilla: Indica que Sup.A hay que ejercer en dicha casilla para obtener la Sup.A.
-        -Coeficiente de superioridad actual: Indica la Sup.A que actualmente está ejerciendo un jugador.
+        o    Coeficiente de superioridad de casilla: Indica que Sup.A hay que ejercer en dicha casilla para obtener la Sup.A.
+        o    Coeficiente de superioridad actual: Indica la Sup.A que actualmente está ejerciendo uno de los jugadores.
     Ejemplo: Una casilla está definida por [10 / 6 (J2)] (10 es el coeficiente de Sup.A de casilla y 6 el actualmente ejercido por el J2). Si como en el ejemplo anterior, una aeronave de J1 permanece 2 turnos en dicha casilla la casilla estará definida por [10 / 4 (J1)]. Si la misma aeronave es capaz de estar cuatro turnos en dicha casilla, J1 obtendrá la Sup.A en dicha casilla ya que el nivel de Sup.A actual de J1 es superior al de la casilla [10 / 14 (J1)].
+
+        -    Tipos de superioridad aérea
     Existirán 2 tipos de superioridad aérea, tal y como describe la NATO en el AJP 3.3.:
-        -Superioridad aérea (Sup.A): Grado de dominación que permite dirigir operaciones en un momento y lugar dado sin que la interferencia enemiga sea prohibitiva para el desarrollo de las mismas. Se conseguirá cuando el coeficiente de Sup.A de un jugador sea igual o mayor al de la casilla.
-        -Supremacía aérea (Supre.A): Grado donde la fuerza aérea enemiga es incapaz de interferir efectivamente a las operaciones propias. Se conseguirá cuando el coeficiente de Sup.A de un jugador sea igual al doble o mayor al de la casilla. Obtener la Supre.A de una casilla permite al jugador poder crear una ciudad o una base en dicha casilla.
+        o    Superioridad aérea (Sup.A): Grado de dominación que permite dirigir operaciones en un momento y lugar dado sin que la interferencia enemiga sea prohibitiva para el desarrollo de las mismas. Se conseguirá cuando el coeficiente de Sup.A de un jugador sea igual o mayor al de la casilla.
+        o    Supremacía aérea (Supre.A): Grado donde la fuerza aérea enemiga es incapaz de interferir efectivamente a las operaciones propias. Se conseguirá cuando el coeficiente de Sup.A de un jugador sea igual al doble o mayor al de la casilla. Obtener la Supre.A de una casilla permite al jugador poder crear una ciudad o una base en dicha casilla.
     En el juego también tendrá presencia el estado de igualdad aérea, en el caso de que ninguno de los jugadores posea superioridad aérea.
-    En la primera pantalla aparecerá el tablero de juego, la tienda de productos y el panel de información.
-        -Tablero de juego: Esta formado por casillas hexagonales. Existen diferentes tipos de casillas en función de su desempeño en el juego, diferenciándose en su color y en los coeficientes asociados a sus características:
-            [AZUL] Territorio 1: Casillas en propiedad del jugador 1.
-                -Coeficiente de Sup.A de casilla: 20
-            [NARANJA] Territorio 2: Casillas en propiedad del jugador 2.
-                -Coeficiente de Sup.A de casilla: 20
-            [NEGRA (AZUL/NARANJA)] Ciudad: Casilla que da al jugador recursos cuando es de su propiedad.
-                -Coeficiente de Sup.A de casilla: 40
-                -Coeficiente de desarrollo: Nivel de infraestructura alcanzado. Cada ciudad otorgará al jugador (5M x nivel) de la ciudad en cada turno.
-            [VERDE (AZUL/NARANJA)] Base aérea: Casilla desde la que se despliegan los medios. Cada base podrá desplegar tantos medios como alto sea su nivel.
-                -Coeficiente de Sup.A de casilla: 60
-                -Coeficiente de movilidad aérea: Nivel de infraestructura alcanzado. Desde cada base se podrán desplegar tantas aeronaves como nivel tenga la base.
-            [DORADO(AZUL/NARANJA)] Capital: Ciudad más importante de cada jugador. Si el adversario consigue obtener supremacía aérea en dicha casilla, gana la partida.
-                -Coeficiente de Sup.A de casilla: 100
-                -Coeficiente de desarrollo: Nivel de infraestructura alcanzado.
-    -Tienda de productos: Aparecen los 9 productos disponibles en el juego con una serie de características asociadas:
-            -Medios aéreos:
-                [AVO. CAZA]: Único medio aéreo que puede atacar otros medios aéreos. El otro medio anti aéreo que puede hacerlo es la batería antiaérea.
-                [AVO. ATAQUE]: Medio aéreo capaz de atacar medios anti aéreos.
-                [AVO. TRANSPORTE]: Medio aéreo con más alcance.
-                [HELICÓPTERO]: Único medio aéreo capaz de aterrizar en una casilla que no sea una base. Además es capaz de atacar medios anti aéreos.
-                [DRON]: Único medio aéreo con capacidad de vigilancia y con mayor autonomía, además es capaz de atacar medios anti aéreos.
-        -Medios anti aéreos:
-            [RADAR]: Medio antiaéreo con el mayor alcance de vigilancia.
-            [BATERÍA ANTIAÉREA]: Único medio antiaéreo con capacidad de atacar medios aéreos además de tener capacidad de vigilancia.
-        -Medios estratégicos:
-            [INTELIGENCIA]: Medio estratégico que permite obtener diversa información sobre el adversario.
-            [INFRAESTRUCTURA]: Medio estratégico que permite aumentar el nivel de las ciudades y bases propias.
-    -Panel de información: En el aparecerá la información correspondiente al elemento que en ese momento este indicando el ratón. Además de una breve descripción de cada producto aparecerá la siguiente información dependiendo de si se tratan de medios aéreos, anti aéreos o estratégicos:
-            -Medios aéreos y anti aéreos:
-            [PRECIO]: coste del medio (€)
-            [VELOCIDAD]: velocidad a la que va a poder avanzar por las casillas un producto / (km/h) - (casillas/turno).
-            [AUTONOMÍA]: tiempo que va a poder estar fuera de la base un producto / (horas) - (turnos).
-            [ALCANCE]: distancia (horizontal) a la que va a poder llegar un producto / (km) - (casillas).
-            [HUELLA]: probabilidad de ser captado por una vigilancia 100% / (%).
-            [DISTAIRE]: distancia a la que puede derribar un medio aéreo / (casillas).
-            [DISTSUP]: distancia a la que puede derribar un medio antiaéreo / (casillas).
-            [VIGILANCIA]: probabilidad de captar un producto con huella radar 100% / (%).
-            [RADIOVIG.]: distancia a la que puede vigilar otro producto / (km) - (casillas).
-            [SUPAEREA]: peso de cada producto a la hora de aportar superioridad aérea / (número).
-            -Medios estratégicos:
-            [INTELIGENCIA]:
-                (NIVEL 1): Da la posición de una de las ciudades del oponente.
-                (NIVEL 2): Da la posición de todas las ciudades del oponente.
-                (NIVEL 3): Da la posición de la capital del oponente.
-                (NIVEL 4): Da el nivel de las ciudades y bases del oponente.
-                (NIVEL 5): Da información sobre el número de medios de los que dispone el oponente.
-            [INFRAESTRUCTURA]: este medio estratégico podrá ser ejercido en las siguientes casillas:
-                (CASILLA CON SUPREMACÍA AÉREA): Se creará una ciudad o una base de nivel 1.
-                (CIUDAD): Cada nivel de mejora proporcionará más recursos al jugador / 10M x Nivel de ciudad.
-                (BASE): El nivel de la base determinará el número de medios que se pueden mover de dicha base / 1 medio x Nivel de la base.
-    A continuación el jugador deberá elegir en que casillas colocar las ciudades, las bases aéreas y los medios comprados:
-        [CIUDADES Y BASES AÉREAS]: Deberán ser colocados en casillas con supremacía aérea del propio jugador.
-            -Al inicio de la partida el jugador contará con 3 ciudades y 3 bases aéreas que podrá colocar en las casillas en las que posee supremacía aérea.
-        [MEDIOS AÉREOS]: Deberán ser colocados en bases aéreas.
-        [MEDIOS ANTIAÉREOS]: Deberán ser colocados en casillas con superioridad aérea del propio jugador.
-    La dinámica principal del juego se basa en turnar una serie de acciones entre los jugadores. Estas acciones serán:
-        -Recibir reporte del movimiento del adversario:
-            [Ataque del enemigo ]: Derribo, destrucción o fracasos de ataques sobre medios propios.
-            [Conquista de casillas]: En el caso de que el enemigo haya conseguido variar el estado de superioridad aérea de una casilla esta cambiara de color dependiendo de su estado actual.
-            [Captación de medios del enemigo]: Captación de medios enemigos por radares, baterías y drones propios.
-        -Recibir ingresos: Los ingresos que se recibirán serán los siguiente:
-            [500M]: Al inicio de la partida.
-            [10M x ciudad x nivel de la ciudad]: Al principio de cada turno.
-        -Recibir inteligencia: La inteligencia recibida dependerá de su nivel.
-        -Invertir ingresos: El crédito disponible podrá ser gastado en los productos disponibles en la tienda.
-        -Movilizar aeronaves: A la hora de movilizar aeronaves hay que tener una serie de aspectos en cuenta:
-            [Capacidad de despliegue]: Cada base aérea podrá tener desplegados en un mismo turno tantos medios aéreos como nivel tenga.
-            [Despegue y aterrizaje en la misma base aérea]: Todas las aeronaves deberán despegar y aterrizar en la misma base aérea. Excepto el helicóptero y el avión de transporte.
-            [Caso especial, helicóptero]: Puede aterrizar y despegar en cualquier casilla. Solo ejercerá superioridad aérea cuando este en vuelo. Hasta que este no retorne a la base aérea desde la que despegó contará como medio aéreo desplegado para dicha base.
-            [Caso especial, avión de transporte]: Puede aterrizar y despegar en cualquier base aérea amiga o ciudad, ya se amiga o enemiga. Solo ejercerá superioridad aérea cuando este en vuelo. Hasta que este no retorne a la base aérea desde la que despegó contará como medio aéreo desplegado para dicha base.
-            [Alcance]: Cada aeronave tiene un alcance de casillas que es inversamente proporcional al tiempo de permanencia (turnos) que queremos que este en la casilla seleccionada. Es decir, cuanto más lejos queremos que llegue, menos tiempo podrá permanecer en dicha casilla.
-            [Permanencia]: Cada aeronave podrá permanecer un número determinado de turnos en la casilla seleccionada dependiendo del alcance al que se haya querido movilizar a la aeronave.
-            [Conquista por parte del rival de una base aérea]: Si el oponente es capaz de conseguir la superioridad aérea de una base, tanto los medios desplegados como los medios que estén en la propia base sin desplegar, serán derribados y por lo tanto eliminados del juego.
-        -Ataque: Las aeronaves con capacidad de ataque, ya sea aire-aire o aire-suelo que estén en el aire podrán atacar a una casilla en cada turno que estén en el aire. Dicho ataque será visualizado por el oponente, es decir el adversario podrá ver que casilla ha sido atacada y si ha sido un ataque aire-aire o aire-suelo. Si el ataque ha sido certero los medios aéreos (ataque aire-aire) o antiaéreos (aire-suelo) serán destruidos.
+
+        -    Fin del juego
     El juego finalizará cuando se cumpla uno de los siguientes requisitos:
-        -Jx obtenga Supre.A en la capital del adversario. Gana Jx.
-        -Jx obtenga Sup.A en todas las ciudades y la capital del adversario. Gana Jx.
-        -(Jx) obtenga Sup.A en todas las bases del adversario. Gana Jx.
-        -Se acabe el número de rondas establecido previamente por los jugadores. Gana el jugador que sume más puntos de coeficiente de Sup.A.
+        o    Jx obtenga Supre.A en la capital del adversario. Gana Jx.
+        o    Jx obtenga Sup.A en todas las ciudades y la capital del adversario. Gana Jx.
+        o    Jx obtenga Sup.A en todas las bases del adversario. Gana Jx.
+        o    Se acabe el número de rondas establecido previamente por los jugadores. Gana el jugador que sume más puntos Airgame, estos se calculan según los puntos resultantes de la siguiente suma:
+            •    Casillas con superioridad aérea: 1 punto.
+            •    Casillas con supremacía aérea: 3 puntos.
+            •    Ciudades y capital: 30 puntos.
+            •    Bases aéreas: 50 puntos.
+            •    Aeronaves: Sus respectivos coeficientes de superioridad aérea.
+
+    PREPARACIÓN PARTIDA
+    Al iniciar el juego, antes de que aparezca la pantalla principal aparecerá lo siguiente:
+        -    Reglas
+    Pantalla en la que aparecerá la información y normas necesarias para jugar. En su gran mayoría el texto que aparecerá será el mismo que en el presente documento.
+        -    Selección de la duración de la partida
+    Se permitirá al jugador escoger el número de rondas a jugar. Una vez superado ese número de rondas el jugador podrá seguir jugando si así lo desea o finalizar la partida. En caso de finalizar la partida el vencedor se determinará en función de lo explicado anteriormente en el apartado fin del juego.
+
+    PANTALLA INICIAL
+    En la primera pantalla aparecerá el tablero de juego, la tienda de productos y el panel de información:
+        -    Tablero de juego
+    Está formado por casillas hexagonales. Existen diferentes tipos de casillas en función de su desempeño en el juego, diferenciándose en su color y en los coeficientes asociados a sus características:
+        o    Tipos de casillas:
+            •    [Azul] Territorio 1: Casillas en propiedad del jugador 1.
+                *    Coeficiente de Sup.A de casilla: 20.
+            •    [Naranja] Territorio 2: Casillas en propiedad del jugador 2.
+                *    Coeficiente de Sup.A de casilla: 20.
+            •    [Negra (azul/naranja)] Ciudad: Casilla que da al jugador recursos cuando es de su propiedad.
+                *    Coeficiente de Sup.A de casilla: 40 (+5 x nivel).
+                *    Nivel ciudad: Cada ciudad otorgará al jugador (10M x nivel) de la ciudad en cada turno.
+            •    [Verde (azul/naranja)] Base aérea: Casilla desde la que se despliegan los medios. Cada base podrá desplegar tantos medios como alto sea su nivel.
+                *    Coeficiente de Sup.A de casilla: 60 (+5 x nivel).
+                *    Nivel base aérea: Desde cada base se podrán desplegar tantas aeronaves como nivel tenga la base.
+            •    [Dorado(azul/naranja)] Capital: Ciudad más importante de cada jugador. Si el adversario consigue obtener supremacía aérea en dicha casilla, gana la partida.
+                *    Coeficiente de Sup.A de casilla: 100 (+5 x nivel).
+                *    Nivel capital: La capital al igual que la ciudad, otorgará al jugador (10M x nivel) de la capital en cada turno.
+        -    Tienda de productos
+    Aparecen los 9 productos disponibles en el juego con una serie de características asociadas:
+        o    Medios aéreos:
+            •    Avión de caza: Único medio aéreo que puede atacar otros medios aéreos. El otro medio anti aéreo que puede hacerlo es la batería antiaérea.
+            •    Avión de ataque: Medio aéreo capaz de atacar medios anti aéreos.
+            •    Avión de transporte: Medio aéreo con más alcance. Puede aterrizar en cualquier base aérea amiga o ciudad ya sea amiga o enemiga.
+            •    Helicóptero: Único medio aéreo capaz de aterrizar en cualquier casilla. Además es capaz de atacar medios anti aéreos.
+            •    Dron: Único medio aéreo con capacidad de vigilancia y con mayor autonomía, además es capaz de atacar medios anti aéreos.
+        o    Medios antiaéreos:
+            •    Radar: Medio antiaéreo con el mayor alcance de vigilancia.
+            •    Batería antiaérea: Único medio antiaéreo con capacidad de atacar medios aéreos además de tener capacidad de vigilancia.
+        o    Medios estratégicos:
+            •    Inteligencia: Medio estratégico que permite obtener diversa información sobre el adversario.
+            •    Infraestructura: Medio estratégico que permite aumentar el nivel de las ciudades y bases propias.
+        -    Panel de información:
+    En el aparecerá la información correspondiente al elemento que en ese momento este indicando el ratón. Además de una breve descripción de cada producto aparecerá la siguiente información dependiendo de si se tratan de medios aéreos, anti aéreos o estratégicos:
+        o    Características medios aéreos y antiaéreos:
+            •    Coste: Precio del medio (Millones de €).
+            •    Velocidad: Rapidez a la que va a poder avanzar un medio aéreo / (km/h) - (casillas/turno).
+            •    Autonomía: Tiempo que va a poder estar en el aire un medio aéreo / (horas) - (turnos).
+            •    Alcance: Distancia a la que va a poder llegar un medio aéreo / (km) - (casillas).
+            •    Detectabilidad: Visibilidad que el medio ofrece a los sistemas de vigilancia / (M²) - (% de ser detectado por una vigilancia 100%).
+            •    Vigilancia: Probabilidad de captar un medio aéreo / (% de detectar una aeronave con detectabilidad 100%).
+            •    Radio de vigilancia: Distancia a la que puede vigilar otro medio / (km) - (casillas).
+            •    Ataque aire: Distancia a la que puede derribar un medio aéreo / (km) - (casillas).
+            •    Ataque superficie: distancia a la que puede derribar un medio antiaéreo / (km) - (casillas).
+            •    Superioridad aérea: peso de cada medio a la hora de aportar superioridad aérea / (Sup.A/turno).
+        o    Características medios estratégicos:
+            •    Inteligencia:
+                *    Nivel 1: Da información sobre el dinero que genera el oponente en cada turno.
+                *    Nivel 2: Da el nivel de las ciudades y bases del oponente.
+                *    Nivel 3: Da información sobre el número de medios aéreos y antiaéreos de los que dispone el oponente.
+                *    Nivel 4: Da posición de un medio adversario en cada turno.
+                *    Nivel 5:  Da información sobre la inteligencia que el otro jugador posee de nuestras fuerzas.
+            •    Infraestructuras: este medio estratégico podrá ser ejercido en las siguientes casillas:
+                *    Casilla con supremacía aérea: Se creará una ciudad o una base de nivel 1. (200M)
+                *    Base: El nivel de la base determinará el número de medios que se pueden desplegar / 1 medio x Nivel de la base. (150M)
+                *    Ciudad: Cada nivel de mejora proporcionará más recursos al jugador / 10M x Nivel de ciudad. (100M)
+
+        COLOCACIÓN DE BASES AÉREAS, CIUDADES Y MEDIOS
+        A continuación el jugador deberá elegir en que casillas colocar las ciudades, las bases aéreas y los medios comprados:
+        -    Ciudades y bases aéreas: Deberán ser colocados en casillas con supremacía aérea del propio jugador. Al inicio de la partida y sin haberlas comprado en la tienda, el jugador contará con:
+            o    2 ciudades.
+            o    1 capital.
+            o    3 bases aéreas.
+        -    Medios aéreos: Deberán ser colocados en bases aéreas.
+        -    Medios antiaéreos: Deberán ser colocados en casillas con superioridad aérea del propio jugador.
+
+        DINÁMICA PRINCIPAL
+        La dinámica principal del juego se basa en turnar una serie de acciones entre los jugadores. Estas acciones serán:
+        -    Recibir reporte del movimiento del adversario e inteligencia:
+            o    Ataque propio: Derribo de aeronaves enemigas por baterías antiaéreas propias.
+            o    Ataque del enemigo: Derribo, destrucción o fracasos de ataques adversarios sobre medios propios.
+            o    Conquista de casillas: En el caso de que el enemigo haya conseguido variar el estado de superioridad aérea de una casilla esta cambiará de color dependiendo de su estado actual. La actualización del coeficiente de Sup.A actual, se producirá cuando la aeronave que ha causado dicha superioridad haya regresados a su destino o haya sido destruida.
+            o    Detección de medios enemigos: Captación de aeronaves adversarias por radares, baterías y drones propios.
+            o    Recibir inteligencia: La inteligencia recibida dependerá de su nivel de mejora, recibiendo la inteligencia correspondiente a su nivel y a los inferiores.
+        -    Recibir ingresos: Los ingresos que se recibirán serán los siguiente:
+            o    500M: Al inicio de la partida.
+            o    10M x ciudad x nivel de la ciudad: Al principio de cada turno.
+            o    1M x casilla con superioridad aérea: Al principio de cada turno.
+            o    2M x casilla con supremacía aérea: Al principio de cada turno.
+        -    Invertir recursos: El crédito disponible podrá ser gastado en los productos disponibles en la tienda.
+        -    Ataque: Las aeronaves con capacidad de ataque, ya sea aire-aire o aire-suelo que estén desplegadas podrán atacar a una casilla en cada turno. Dicho ataque será visualizado por el oponente, es decir el adversario podrá ver que casilla ha sido atacada y si ha sido un ataque aire-aire o aire-suelo. Si el ataque ha sido certero, los medios aéreos (ataque aire-aire) o antiaéreos (aire-suelo) serán destruidos.
+        -    Movilización de aeronaves: Hay que tener una serie de aspectos en cuenta:
+            o    Capacidad de despliegue: Cada base aérea podrá tener desplegados en un mismo turno tantos medios aéreos como nivel tenga.
+            o    Despegue y aterrizaje en la misma base aérea: Todas las aeronaves deberán despegar y aterrizar en la misma base aérea. Excepto el helicóptero y el avión de transporte.
+                *    Caso especial, helicóptero: Puede aterrizar y despegar en cualquier casilla. Solo ejercerá superioridad aérea cuando este en vuelo. Hasta que este no retorne a la base aérea desde la que despegó contará como medio aéreo desplegado para dicha base.
+                *    Caso especial, avión de transporte: Puede aterrizar y despegar en cualquier base aérea amiga o ciudad, ya se amiga o enemiga. Solo ejercerá superioridad aérea cuando este en vuelo. Hasta que este no retorne a la base aérea desde la que despegó contará como medio aéreo desplegado para dicha base.
+            o    Alcance: Cada aeronave tiene un alcance de casillas que es inversamente proporcional al tiempo de permanencia (turnos) que queremos que este en la casilla seleccionada. Es decir, cuanto más lejos queremos que llegue, menos tiempo podrá permanecer en dicha casilla.
+            o    Permanencia: Cada aeronave podrá permanecer un número determinado de turnos en la casilla seleccionada dependiendo del alcance al que se haya querido movilizar a la aeronave. Si el jugador así lo desea, la aeronave podrá retornar antes de la permanencia seleccionada inicialmente.
+            o    Conquista por parte del rival de una base aérea: Si el oponente es capaz de conseguir la superioridad aérea de una base, tanto los medios desplegados como los medios que estén en la propia base sin desplegar, serán derribados y por lo tanto eliminados del juego.
     """
     LINEAS_POR_PAGINA = 20        # Numero de lineas por pagina de reglas
     TAMANO_FUENTE     = 16        # Tamaño de fuente del resto de texto
