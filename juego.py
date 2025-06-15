@@ -27,6 +27,7 @@
 #       Esqueleto del proceso en cada fotograma: escanear eventos,
 #       actualizar estado, y dibujar en pantalla.
 
+import amplpy  # Progración lineal
 import math    # Operaciones y funciones matemáticas
 import os      # Manipulaciones del sistema
 import pygame  # Motor del juego
@@ -129,6 +130,11 @@ TEXTURA_TIENDA_COLOR    = '#cc330080'
 TEXTURA_INFO_COLOR      = '#66669920'
 TEXTURA_REGLAS_COLOR    = '#80808020'
 TEXTURA_BOTON_COLOR     = '#0675ac20'
+
+AMPL_COMPRA     = 'compra'      # Ficheros que contienen el modelo lineal para decidir qué comprar en cada turno
+AMPL_ATAQUE     = 'ataque'      # Ídem para planificar un ataque
+AMPL_POSICION   = 'posicion'    # Ídem para determinar la posición de un medio
+AMPL_MOVIMIENTO = 'movimiento'  # Ídem para determinar el despliegue de un medio
 
 # Escenario
 MAPA_DIM_X = 25 # Anchura del mapa en casillas
@@ -1585,8 +1591,9 @@ class Jugador:
     jugadores = 0
 
     def __init__(self, ia):
-        self.indice = self.jugadores # Índice numérico del jugador (0, 1)
-        self.ia     = ia             # Si el jugador es IA o no
+        self.indice  = self.jugadores # Índice numérico del jugador (0, 1)
+        self.ia      = ia             # Si el jugador es IA o no
+        self.modelos = { nombre: AMPL(nombre) for nombre in (AMPL_COMPRA, AMPL_POSICION, AMPL_MOVIMIENTO, AMPL_ATAQUE) }
         type(self).jugadores += 1
         self.resetear()
 
@@ -1603,15 +1610,19 @@ class Jugador:
         self.inteligencia     = 0               # Nivel de inteligencia actualmente contratado
         self.situar_off()
         self.atacar_off()
+        for modelo in self.modelos.values():
+            modelo.resetear()
 
-    def comprar(self, producto):
+    def comprar(self, producto, casilla = None):
         """Adquirir un medio de ataque (aéreo o antiaéreo) y añadirlo al inventario"""
         if not self.pagar(producto.PRECIO):
             return
         if not issubclass(producto, MedioAtaque):
             return
-        self.medios.append(producto(self, g_escenario.casilla_pulsa))
-        g_info.dinero(f'Has adquirido un {producto.NOMBRE} en la casilla {g_escenario.casilla_pulsa.id()}')
+        if not casilla:
+            casilla = g_escenario.casilla_pulsa
+        self.medios.append(producto(self, casilla))
+        g_info.dinero(f'Has adquirido un {producto.NOMBRE} en la casilla {casilla.id()}')
         g_escenario.cambio = True
 
     def contratar(self):
@@ -1624,8 +1635,10 @@ class Jugador:
             self.inteligencia += 1
             g_info.info(f'Contrada inteligencia de nivel {self.inteligencia}')
 
-    def construir(self, producto, casilla):
+    def construir(self, producto, casilla = None):
         """Construir o mejorar una infraestructura en el mapa"""
+        if not casilla:
+            casilla = g_escenario.casilla_pulsa
         infra = casilla.infraestructura
         if infra:
             if type(infra) is not producto: # Infraestructura de otro tipo -> Error
@@ -1741,15 +1754,35 @@ class Jugador:
         """Devolver el adversario de este jugador"""
         return g_jugadores[self.indice ^ 1]
 
-    def ia_comprar(self):
+    def ia_compra(self):
         """Decidir qué recursos adquirir en el turno de la IA"""
-        pass
 
-    def ia_construir(self):
-        """Decidir qué infraestructuras construir en el turno de la IA"""
-        pass
+        # Configurar modelo de AMPL y resolverlo
+        modelo = self.modelos['compra']
+        modelo.parametro('P', [self.credito])
+        modelo.parametro('S', [round(random.random()) for _ in range(29)])
+        modelo.ejecutar()
 
-    def ia_desplegar(self):
+        # Comprar productos resultantes
+        compras = [var[1] for var in modelo.variable('X')]
+        productos = [AvionCaza, AvionAtaque, AvionTransporte, Helicoptero, Dron, Radar, Bateria, Ciudad, Base]
+        for compra, producto in zip(compras, productos):
+            if compra == 0:
+                continue
+            if issubclass(producto, MedioAtaque):
+                self.comprar(producto, self.ia_posicion(True))
+            elif issubclass(producto, Infraestructura):
+                self.construir(producto, self.ia_posicion(False))
+
+    def ia_posicion(self, medio):
+        """Dónde colocar los recursos adquiridos en este turno de la IA"""
+        if medio:
+            casillas = [c for col in g_escenario.casillas for c in col if c.hay_superioridad(self)]
+        else:
+            casillas = [c for col in g_escenario.casillas for c in col if c.hay_supremacia(self) and not c.infraestructura]
+        return random.sample(casillas, 1)[0]
+
+    def ia_movimiento(self):
         """Decidir dónde desplegar un medio en el turno de la IA"""
         pass
 
@@ -2347,6 +2380,67 @@ class Ayuda:
         self.texto.mover((x + 2, y - 1))
         self.texto.dibujar()
 
+class AMPL:
+    """
+        Representa un modelo de programación lineal dedicado a decidir el
+        movimiento de la IA del juego
+    """
+
+    VARIABLE_SOLUCION = 'X' # Variable del modelo que contiene la solución buscada
+
+    def __init__(self, tipo, solver = 'cbc'):
+        self.fichero_modelo = tipo + '.mod'
+        self.fichero_datos  = tipo + '.dat'
+        self.ampl           = amplpy.AMPL()
+        self.solver         = solver
+        self.solucion       = None
+        self.cargar()
+
+    def cargar(self):
+        """Cargar los ficheros del modelo, sólo hace falta hacerlo una vez"""
+        self.ampl.read(self.fichero_modelo)
+        self.ampl.read_data(self.fichero_datos)
+
+    def resetear(self):
+        """Reiniciar los datos del modelo para preparar la siguiente ejecución"""
+        self.ampl.reset()
+        self.solucion = None
+
+    def configurar(self):
+        "Establecer las opciones del solver"
+        self.ampl.set_option('solver', self.solver)
+
+    def resolver(self):
+        """Resolver el problema con el solver escogido"""
+        self.ampl.solve()
+        if self.ampl.solve_result != 'solved':
+            self.solucion = None
+            return False
+        else:
+            self.solucion = self.variable(self.VARIABLE_SOLUCION)
+            return True
+
+    def variable(self, nombre = VARIABLE_SOLUCION):
+        """Leer el valor de una variable"""
+        try:
+            return self.ampl.get_variable(nombre).get_values().to_list()
+        except:
+            return None
+
+    def parametro(self, nombre, valor):
+        """Cambiar el valor de un parámetro del modelo"""
+        try:
+            self.ampl.get_parameter(nombre).set_values(valor)
+            return True
+        except:
+            return False
+
+    def ejecutar(self):
+        """Ejecutar el modelo"""
+        self.resetear()
+        self.configurar()
+        self.resolver()
+
 # < -------------------------------------------------------------------------- >
 #                         FUNCIONES AUXILIARES INTERFAZ
 # < -------------------------------------------------------------------------- >
@@ -2591,12 +2685,23 @@ def actualizar_paso_ingresos():
 
 def actualizar_paso_recursos():
     """Desarrollar el paso de recursos. El jugador invierte crédito en adquirir medios
-    aéreos, antiaéreos o estratégicos - como inteligencia o infraestructuras."""
-    pass
+    aéreos, antiaéreos o estratégicos - como inteligencia o infraestructuras.
+    Sólo hay que hacer algo automáticamente en el caso del jugador IA"""
+    if not g_jugador.ia:
+        return
+    global g_paso_listo
+    g_jugador.ia_compra()
+    g_paso_listo = True
 
 def actualizar_paso_despliegue():
-    """Desarrollar el paso de despliegue. El jugador moviliza aeronaves en alguna casilla."""
-    pass
+    """Desarrollar el paso de despliegue y ataque. El jugador moviliza aeronaves en alguna casilla.
+    Sólo hay que hacer algo automáticamente en el caso del jugador IA"""
+    if not g_jugador.ia:
+        return
+    global g_paso_listo
+    g_jugador.ia_movimiento()
+    g_jugador.ia_ataque()
+    g_paso_listo = True
 
 def verificar_turno():
     """Comprobar que el jugador ha realizado un turno válido y podemos pasar al siguiente"""

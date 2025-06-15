@@ -1,6 +1,6 @@
 #Como cargar datos en AMPL
 #Conjuntos
-set C := C1 C2 C3 C4 C5 C6 C7 C8 C9 C10 C11 C12 C13 C14 C15 C16 C17 C18 C19 C20 C21 C22 C23 C24 C25 C26 C27 C28 C29
+set C := C1 C2 C3 C4 C5 C6 C7 C8 C9 C10 C11 C12 C13 C14 C15 C16 C17 C18 C19 C20 C21 C22 C23 C24 C25 C26 C27 C28 C29;
 
 
 ##Desarrollo de los condicionantes
@@ -28,45 +28,45 @@ set C := C1 C2 C3 C4 C5 C6 C7 C8 C9 C10 C11 C12 C13 C14 C15 C16 C17 C18 C19 C20 
 #C22: ba2 <(ti2/2)
 #C23: ra2 <ti2
 #C24: ba2 <ti2
-#C25: BASE AÉREA SIN VIGILAR (por radar)
+#C25: BASE Aï¿½REA SIN VIGILAR (por radar)
 #C26: CIUDAD SIN VIGILAR (por radar)
-#C27: BASE AÉREA SIN PROTEGER (por batería)
-#C28: CIUDAD SIN PROTEGER (por batería)
+#C27: BASE Aï¿½REA SIN PROTEGER (por baterï¿½a)
+#C28: CIUDAD SIN PROTEGER (por baterï¿½a)
 #C29: sa2 <sa1
 
-##Definición de algunas de las abreviaturas utilizadas en los condicionantes
-#ac=nº A.CAZA
-#aa=nº A.ATAQUE
-#at=nº A.TRANSPORTE
-#he=nº HELICÓPERO
-#dr=nº DRON
+##Definiciï¿½n de algunas de las abreviaturas utilizadas en los condicionantes
+#ac=nï¿½ A.CAZA
+#aa=nï¿½ A.ATAQUE
+#at=nï¿½ A.TRANSPORTE
+#he=nï¿½ HELICï¿½PERO
+#dr=nï¿½ DRON
 #ta=aa+ac+at+he+dr
-#ba=nº BASE AÉREA
-#ci=nº CIUDAD
+#ba=nï¿½ BASE Aï¿½REA
+#ci=nï¿½ CIUDAD
 #ti=ba+ci
-#ra=nºRADAR
-#ba=nº BATERÍA ANTIAÉREA
-#sa=casillas con superioridad aérea
-#xx(1)=parámetro asociado a J1
-#xx(2)=parámetro asociado a J2 (máquina)
+#ra=nï¿½RADAR
+#ba=nï¿½ BATERï¿½A ANTIAï¿½REA
+#sa=casillas con superioridad aï¿½rea
+#xx(1)=parï¿½metro asociado a J1
+#xx(2)=parï¿½metro asociado a J2 (mï¿½quina)
 
 
-set A := A1 A2 A3 A4 A5 A6 A7 A8 A9
+set A := A1 A2 A3 A4 A5 A6 A7 A8 A9;
 
 ##Desarrollo de las acciones
-#A1: Compra de avión de caza
-#A2: Compra de avión de ataque
-#A3: Compra de avión de transporte
-#A4: Compra de helicóptero
+#A1: Compra de aviï¿½n de caza
+#A2: Compra de aviï¿½n de ataque
+#A3: Compra de aviï¿½n de transporte
+#A4: Compra de helicï¿½ptero
 #A5: Compra de dron
 #A6: Compra de radar
-#A7: Compra de batería antiaérea
+#A7: Compra de baterï¿½a antiaï¿½rea
 #A8: Compra de ciudad
-#A9: Compra de base aérea
+#A9: Compra de base aï¿½rea
 
 
-#Parámetros
-#Coeficientes de importancia de cada condicionante a cada acción
+#Parï¿½metros
+#Coeficientes de importancia de cada condicionante a cada acciï¿½n
 param Y:	A1	A2	A3	A4	A5	A6	A7	A8	A9	:=
 C1	120	0	0	0	0	0	0	0	0	
 C2	0	200	0	0	0	0	0	0	0	
@@ -100,10 +100,10 @@ C29	100	100	250	20	5	-10	-50	-150	-100
 ;										
 
 #Se da o no cada condicionante
-param S:=
+param S :=
 ;
 
-#Coste de la acción a tomar
+#Coste de la acciï¿½n a tomar
 param K :=
 A1 67
 A2 142
@@ -117,5 +117,5 @@ A9 300
 ;
 
 #Presupuesto actual
-param P:=
+param P :=
 ;
